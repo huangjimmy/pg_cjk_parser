@@ -226,6 +226,115 @@ SET default_text_search_config = 'public.config_2_gram_cjk';
 
 Now you can execute the sql demonstrated in the introduction section to see the results.
 
+### Search Configuration dictionary mappings
+
+```sql
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR asciihword
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR cjk
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR email
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR asciiword
+    WITH english_stem;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR entity
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR file
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR float
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR host
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR hword
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR hword_asciipart
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR hword_numpart
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR hword_part
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR int
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR numhword
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR numword
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR protocol
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR sfloat
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR tag
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR uint
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR url
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR url_path
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR version
+    WITH simple;
+
+ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk
+    ADD MAPPING FOR word
+    WITH simple;
+```
+
+Now you can use to_tsvector and to_tsquery to test the newly created search configuration.
+
+```sql
+SELECT to_tsvector('Doraemnon Nobita「ドラえもん のび太の牧場物語」多拉A梦 野比大雄χΨψΩω'), to_tsquery('のび太'), 
+to_tsquery('野比大雄'),
+to_tsvector('Doraemnon Nobita「ドラえもん のび太の牧場物語」多拉A梦 野比大雄χΨψΩω') @@ to_tsquery('のび太'),
+to_tsvector('Doraemnon Nobita「ドラえもん のび太の牧場物語」多拉A梦 野比大雄χΨψΩω') @@ to_tsquery('野比大雄');
+```
+
+|to_tsvector|to_tsquery|to_tsquery|?boolean?|?boolean?|
+|-|-|-|-|-|
+|"'doraemnon':1 'nobita':2 'χψψωω':19 'えも':5 'のび':7 'の牧':10 'び太':8 'もん':6 'ドラ':3 'ラえ':4 '場物':12 '多拉':14 '大雄':18 '太の':9 '比大':17 '牧場':11 '物語':13 '野比':16"|"'のび' & 'び太'"|"'野比' & '比大' & '大雄'"|true|true|
+
 ## License
 
 ### PG CJK Parser
