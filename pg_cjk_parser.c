@@ -2133,6 +2133,12 @@ prsd2_nexttoken(PG_FUNCTION_ARGS)
 			//we want to make sure CJK tokens are 2-gram if possible
             *tlen += pg_mblen(p->str + p->state->posbyte);
         }
+		else if (!p_isCJKunigram(p)){
+			//not CJK 2-gram and it is not unigram CJK itself
+			//treat this as a space
+			p->type = SPACE;
+			*tlen = 0;
+		}
     }
     
 
