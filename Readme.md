@@ -26,7 +26,7 @@ ts_debug('Doraemnon Nobita「ドラえもん のび太の牧場物語」多拉A�
 |"cjk"|"CJK Char"|"ラえ"|
 |"cjk"|"CJK Char"|"えも"|
 |"cjk"|"CJK Char"|"もん"|
-|"cjk"|"CJK Char"|"ん"|
+|"blank"|"Space symbols"|" "|
 |"blank"|"Space symbols"|" "|
 |"cjk"|"CJK Char"|"のび"|
 |"cjk"|"CJK Char"|"び太"|
@@ -38,14 +38,14 @@ ts_debug('Doraemnon Nobita「ドラえもん のび太の牧場物語」多拉A�
 |"cjk"|"CJK Char"|"語"|
 |"cjk"|"CJK Char"|"」"|
 |"cjk"|"CJK Char"|"多拉"|
-|"cjk"|"CJK Char"|"拉"||
+|"blank"|"Space symbols"|" "|
 |"asciiword"|"Word, all ASCII"|"A"|
 |"cjk"|"CJK Char"|"梦"|
 |"blank"|"Space symbols"|" "|
 |"cjk"|"CJK Char"|"野比"|
 |"cjk"|"CJK Char"|"比大"|
 |"cjk"|"CJK Char"|"大雄"|
-|"cjk"|"CJK Char"|"雄"|
+|"blank"|"Space symbols"|" "|
 |"word"|"Word, all letters"|"χΨψΩω"|
 |"blank"|"Space symbols"|" "|
 |"protocol"|"Protocol head"|"https://"|
