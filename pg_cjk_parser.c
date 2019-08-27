@@ -41,7 +41,7 @@ PG_FUNCTION_INFO_V1(prsd2_lextype);
 
 /* Define me to enable tracing of parser behavior */
 /* #define WPARSER_TRACE */
-
+#define WPARSER_TRACE
 
 /* Output token categories */
 
@@ -699,48 +699,118 @@ p_isCJK2gram_twice(TParser *prs){
 #endif
                 return 1;
             }
+#ifdef WPARSER_TRACE
+                fprintf(stderr, " %x %x is not 2-gram state=", c, nc);
+                fprintf(stderr, "%d \n", prs->state->state);
+#endif
             return 0;
 
         }
-        else if (c >= 0x2E80 && c < 0x3000){
+        else if (c >= 0x2E80 && c < 0x3040){
             //other CJK, 
             //one character per token
+#ifdef WPARSER_TRACE
+                fprintf(stderr, " %x is unigram state=", c);
+                fprintf(stderr, "%d \n", prs->state->state);
+#endif
             return 0;
         }
     }
     return 0;
 }
 
+
+static pg_wchar
+p_prevChar(TParser *prs){
+	pg_wchar	c = 0;
+
+	if(prs->state->poschar < 2)return c;
+
+	if (prs->pgwstr)
+		c = *(prs->pgwstr + prs->state->poschar - 2);
+	else
+		c = (pg_wchar) *(prs->wstr + prs->state->poschar - 2);
+
+	return c;
+}
+
+static pg_wchar
+p_nextChar(TParser *prs){
+	pg_wchar	c = 0;
+
+	if(prs->state->posbyte >= prs->lenstr){
+		return c;
+	}
+
+	if (prs->pgwstr)
+		c = *(prs->pgwstr + prs->state->poschar);
+	else
+		c = (pg_wchar) *(prs->wstr + prs->state->poschar);
+
+	return c;
+}
+
 static int
 p_isCJKunigram(TParser *prs){
-    /*
-	 * pg_dsplen could return -1 which means error or control character
-	 */
-	if (pg_dsplen(prs->str + prs->state->posbyte) == 0)
-		return 0;
+	int a, b;
+	pg_wchar	c;
+
+#ifdef WPARSER_TRACE
+	fprintf(stderr, "p_isCJKunigram: enter\n");
+#endif
 
     if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
         //p_isCJKchar only works in UTF8 encoding
-        pg_wchar	c;
+		if(((prs->token[0] ^ 0xE0) & 0xF0) != 0){
+#ifdef WPARSER_TRACE
+				fprintf(stderr, "p_isCJKunigram: current char is not even CJK\n");
+#endif
+			return 0;//not CJK
+		}
 
-		if (prs->pgwstr)
-			c = *(prs->pgwstr + prs->state->poschar);
-		else
-			c = (pg_wchar) *(prs->wstr + prs->state->poschar);
+        a = ((prs->token[0] & 0xF)<<4) | ((prs->token[1]>>2) & 0xF);
+        b = ((prs->token[1] & 0x3)<<6) | (prs->token[2] & 0x3f);
+		c = ((a<<8) | b);
 
-        if (c >= 0x3000 && c <= 0x9FFF){
+#ifdef WPARSER_TRACE
+				fprintf(stderr, "p_isCJKunigram: current char = %x\n", c);
+#endif
+
+        if (c >= 0x3040 && c <= 0x9FFF){
             //CJK Unified Ideographs
-            //token as if it is a 2-gram
+			//if it is surrounded by non-CJK chars or CJK unigrams,
+			//it is also unigram
+			//1. check whether previous char is CJK 3000 to 9FFF
+			//2. check whether next char is CJ3000 to 9FFF
+
+			//next char
+			c = p_nextChar(prs);
+
+#ifdef WPARSER_TRACE
+				fprintf(stderr, "p_isCJKunigram: next char = %x\n", c);
+#endif
+			if(c < 0x3040|| c > 0x9FFF){
+				c = p_prevChar(prs);
+#ifdef WPARSER_TRACE
+				fprintf(stderr, "p_isCJKunigram: prev char = %x\n", c);
+#endif
+				if(c < 0x3040 || c > 0x9FFF)return 1;
+			}
             return 0;
         }
-        else if (c >= 0x2E80 && c < 0x3000){
+        else if (c >= 0x2E80 && c < 0x3040){
             //other CJK, 
             //one character per token
+#ifdef WPARSER_TRACE
+				fprintf(stderr, "p_isCJKunigram: unigram detected\n");
+#endif
             return 1;
         }
         
     }
-
+#ifdef WPARSER_TRACE
+				fprintf(stderr, "p_isCJKunigram: exit database not PG_UTF8\n");
+#endif
     return 0;
 }
 
@@ -2136,6 +2206,9 @@ prsd2_nexttoken(PG_FUNCTION_ARGS)
 		else if (!p_isCJKunigram(p)){
 			//not CJK 2-gram and it is not unigram CJK itself
 			//treat this as a space
+#ifdef WPARSER_TRACE
+				fprintf(stderr, "current CJK is not CJK unigram\n");
+#endif		
 			p->type = SPACE;
 			*tlen = 0;
 		}

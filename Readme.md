@@ -35,7 +35,7 @@ ts_debug('Doraemnon Nobita「ドラえもん のび太の牧場物語」多拉A�
 |"cjk"|"CJK Char"|"牧場"|
 |"cjk"|"CJK Char"|"場物"|
 |"cjk"|"CJK Char"|"物語"|
-|"cjk"|"CJK Char"|"語"|
+|"blank"|"Space symbols"|" "|
 |"cjk"|"CJK Char"|"」"|
 |"cjk"|"CJK Char"|"多拉"|
 |"blank"|"Space symbols"|" "|
