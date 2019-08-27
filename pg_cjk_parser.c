@@ -25,6 +25,20 @@
 #include "utils/builtins.h"
 
 
+Datum prsd2_start(PG_FUNCTION_ARGS);
+Datum prsd2_nexttoken(PG_FUNCTION_ARGS);
+Datum prsd2_end(PG_FUNCTION_ARGS);
+Datum prsd2_headline(PG_FUNCTION_ARGS);
+Datum prsd2_lextype(PG_FUNCTION_ARGS);
+
+PG_MODULE_MAGIC;
+
+PG_FUNCTION_INFO_V1(prsd2_start);
+PG_FUNCTION_INFO_V1(prsd2_nexttoken);
+PG_FUNCTION_INFO_V1(prsd2_end);
+PG_FUNCTION_INFO_V1(prsd2_headline);
+PG_FUNCTION_INFO_V1(prsd2_lextype);
+
 /* Define me to enable tracing of parser behavior */
 /* #define WPARSER_TRACE */
 
@@ -54,8 +68,9 @@
 #define SIGNEDINT		21
 #define UNSIGNEDINT		22
 #define XMLENTITY		23
+#define CJK_CHAR		24
 
-#define LASTNUM			23
+#define LASTNUM			24
 
 static const char *const tok_alias[] = {
 	"",
@@ -81,7 +96,8 @@ static const char *const tok_alias[] = {
 	"float",
 	"int",
 	"uint",
-	"entity"
+	"entity",
+    "cjk"
 };
 
 static const char *const lex_descr[] = {
@@ -108,7 +124,8 @@ static const char *const lex_descr[] = {
 	"Decimal notation",
 	"Signed integer",
 	"Unsigned integer",
-	"XML entity"
+	"XML entity",
+    "CJK Char"
 };
 
 
@@ -193,6 +210,7 @@ typedef enum
 	TPS_InHyphenAsciiWordPart,
 	TPS_InHyphenNumWordPart,
 	TPS_InHyphenUnsignedInt,
+    TPS_InCJK,
 	TPS_Null					/* last state (fake value) */
 } TParserState;
 
@@ -536,6 +554,195 @@ p_isurlchar(TParser *prs)
 	return 1;
 }
 
+/**
+ * 
+2E80–2EFF	CJK Radicals Supplement	中日韓部首補充
+2F00–2FDF	Kangxi Radicals	康熙部首
+2FF0–2FFF	Ideographic Description Characters	漢字結構描述字符
+3000–303F	CJK Symbols and Punctuation	中日韓符號和標點
+3040–309F	Hiragana	平假名
+30A0–30FF	Katakana	片假名
+3100–312F	Bopomofo	注音符號
+3130–318F	Hangul Compatibility Jamo	諺文相容字母
+3190–319F	Kanbun	漢文訓點號
+31A0–31BF	Bopomofo Extended	注音符號擴充
+31C0–31EF	CJK Strokes	中日韓筆畫部件
+31F0–31FF	Katakana Phonetic Extensions	片假名音標擴充
+3200–32FF	Enclosed CJK Letters and Months	括圈中日韓字母及月份
+3300–33FF	CJK Compatibility	中日韓相容字元
+3400–4DBF	CJK Unified Ideographs Extension A	中日韓統一表意文字擴充A
+4DC0–4DFF	Yijing Hexagram Symbols	易經六十四卦象
+4E00–9FFF	CJK Unified Ideographs	中日韓統一表意文字
+ * */
+
+static int
+p_isnotCJK(TParser *prs){
+    /*
+	 * pg_dsplen could return -1 which means error or control character
+	 */
+	if (pg_dsplen(prs->str + prs->state->posbyte) == 0)
+		return 1;
+
+    if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
+        //p_isCJKchar only works in UTF8 encoding
+        pg_wchar	c;
+
+		if (prs->pgwstr)
+			c = *(prs->pgwstr + prs->state->poschar);
+		else
+			c = (pg_wchar) *(prs->wstr + prs->state->poschar);
+
+        if (c >= 0x2E80 && c <= 0x9FFF){
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static int
+p_isCJK(TParser *prs){
+    /*
+	 * pg_dsplen could return -1 which means error or control character
+	 */
+	if (pg_dsplen(prs->str + prs->state->posbyte) == 0)
+		return 0;
+
+    if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
+        //p_isCJKchar only works in UTF8 encoding
+        pg_wchar	c;
+
+		if (prs->pgwstr)
+			c = *(prs->pgwstr + prs->state->poschar);
+		else
+			c = (pg_wchar) *(prs->wstr + prs->state->poschar);
+
+        
+        if (c >= 0x2E80 && c <= 0x9FFF){
+#ifdef WPARSER_TRACE
+            fprintf(stderr, "%x isCJK?", c); fprintf(stderr, " = true\n");
+#endif
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int
+p_isCJK2gram(TParser *prs){
+    /*
+	 * pg_dsplen could return -1 which means error or control character
+	 */
+	if (pg_dsplen(prs->str + prs->state->posbyte) == 0)
+		return 0;
+
+    if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
+        //p_isCJKchar only works in UTF8 encoding
+        pg_wchar	c;
+
+		if (prs->pgwstr)
+			c = *(prs->pgwstr + prs->state->poschar);
+		else
+			c = (pg_wchar) *(prs->wstr + prs->state->poschar);
+
+        if (c >= 0x3040 && c <= 0x9FFF){
+            //CJK Unified Ideographs
+            //a 2-gram token
+            return 1;
+        }
+        else if (c >= 0x2E80 && c < 0x303F){
+            //other CJK, 
+            //one character per token
+            return 0;
+        }
+    }
+    return 0;
+}
+
+static int
+p_isCJK2gram_twice(TParser *prs){
+    
+    pg_wchar	c;
+    int a, b;
+
+    /*
+	 * pg_dsplen could return -1 which means error or control character
+	 */
+	if (pg_dsplen(prs->str + prs->state->posbyte) == 0)
+		return 0;
+
+    if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
+
+        if(prs->state->posbyte > prs->lenstr){
+            return 0;
+        }
+
+        //p_isCJKchar only works in UTF8 encoding
+        if(((prs->token[0] ^ 0xE0) & 0xF0) != 0)return 0;//not CJK
+
+        a = ((prs->token[0] & 0xF)<<4) | ((prs->token[1]>>2) & 0xF);
+        b = ((prs->token[1] & 0x3)<<6) | (prs->token[2] & 0x3f);
+		c = ((a<<8) | b);
+
+        if (c >= 0x3040 && c <= 0x9FFF){
+            //CJK Unified Ideographs
+            //token as if it is a 2-gram
+            pg_wchar nc;
+            if (prs->pgwstr)
+                nc = *(prs->pgwstr + prs->state->poschar);
+            else
+                nc = (pg_wchar) *(prs->wstr + prs->state->poschar);
+
+            if (nc >= 0x3040 && nc <= 0x9FFF){
+#ifdef WPARSER_TRACE
+                fprintf(stderr, " %x %x is 2-gram state=", c, nc);
+                fprintf(stderr, "%d \n", prs->state->state);
+#endif
+                return 1;
+            }
+            return 0;
+
+        }
+        else if (c >= 0x2E80 && c < 0x3000){
+            //other CJK, 
+            //one character per token
+            return 0;
+        }
+    }
+    return 0;
+}
+
+static int
+p_isCJKunigram(TParser *prs){
+    /*
+	 * pg_dsplen could return -1 which means error or control character
+	 */
+	if (pg_dsplen(prs->str + prs->state->posbyte) == 0)
+		return 0;
+
+    if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
+        //p_isCJKchar only works in UTF8 encoding
+        pg_wchar	c;
+
+		if (prs->pgwstr)
+			c = *(prs->pgwstr + prs->state->poschar);
+		else
+			c = (pg_wchar) *(prs->wstr + prs->state->poschar);
+
+        if (c >= 0x3000 && c <= 0x9FFF){
+            //CJK Unified Ideographs
+            //token as if it is a 2-gram
+            return 0;
+        }
+        else if (c >= 0x2E80 && c < 0x3000){
+            //other CJK, 
+            //one character per token
+            return 1;
+        }
+        
+    }
+
+    return 0;
+}
 
 /* deliberately suppress unused-function complaints for the above */
 void		_make_compiler_happy(void);
@@ -563,6 +770,12 @@ _make_compiler_happy(void)
 	p_isEOF(NULL);
 	p_iseqC(NULL);
 	p_isneC(NULL);
+
+    p_isCJK2gram(NULL);
+    p_isCJK2gram_twice(NULL);
+    p_isCJKunigram(NULL);
+    p_isCJK(NULL);
+    p_isnotCJK(NULL);
 }
 
 
@@ -964,6 +1177,7 @@ p_isspecial(TParser *prs)
 
 static const TParserStateActionItem actionTPS_Base[] = {
 	{p_isEOF, 0, A_NEXT, TPS_Null, 0, NULL},
+    {p_isCJK, 0, A_NEXT, TPS_InCJK, 0, NULL}, 
 	{p_iseqC, '<', A_PUSH, TPS_InTagFirst, 0, NULL},
 	{p_isignore, 0, A_NEXT, TPS_InSpace, 0, NULL},
 	{p_isasclet, 0, A_NEXT, TPS_InAsciiWord, 0, NULL},
@@ -981,6 +1195,7 @@ static const TParserStateActionItem actionTPS_Base[] = {
 
 static const TParserStateActionItem actionTPS_InNumWord[] = {
 	{p_isEOF, 0, A_BINGO, TPS_Base, NUMWORD, NULL},
+    {p_isCJK, 0, A_BINGO, TPS_Base, NUMWORD, NULL},
 	{p_isalnum, 0, A_NEXT, TPS_InNumWord, 0, NULL},
 	{p_isspecial, 0, A_NEXT, TPS_InNumWord, 0, NULL},
 	{p_iseqC, '@', A_PUSH, TPS_InEmail, 0, NULL},
@@ -992,7 +1207,7 @@ static const TParserStateActionItem actionTPS_InNumWord[] = {
 
 static const TParserStateActionItem actionTPS_InAsciiWord[] = {
 	{p_isEOF, 0, A_BINGO, TPS_Base, ASCIIWORD, NULL},
-	{p_isasclet, 0, A_NEXT, TPS_Null, 0, NULL},
+    {p_isCJK, 0, A_BINGO, TPS_Base, ASCIIWORD, NULL},
 	{p_iseqC, '.', A_PUSH, TPS_InHostFirstDomain, 0, NULL},
 	{p_iseqC, '.', A_PUSH, TPS_InFileNext, 0, NULL},
 	{p_iseqC, '-', A_PUSH, TPS_InHostFirstAN, 0, NULL},
@@ -1002,7 +1217,8 @@ static const TParserStateActionItem actionTPS_InAsciiWord[] = {
 	{p_iseqC, ':', A_PUSH, TPS_InProtocolFirst, 0, NULL},
 	{p_iseqC, '/', A_PUSH, TPS_InFileFirst, 0, NULL},
 	{p_isdigit, 0, A_PUSH, TPS_InHost, 0, NULL},
-	{p_isdigit, 0, A_NEXT, TPS_InNumWord, 0, NULL},
+    {p_isdigit, 0, A_NEXT, TPS_InNumWord, 0, NULL},
+    {p_isasclet, 0, A_NEXT, TPS_Null, 0, NULL},
 	{p_isalpha, 0, A_NEXT, TPS_InWord, 0, NULL},
 	{p_isspecial, 0, A_NEXT, TPS_InWord, 0, NULL},
 	{NULL, 0, A_BINGO, TPS_Base, ASCIIWORD, NULL}
@@ -1010,6 +1226,7 @@ static const TParserStateActionItem actionTPS_InAsciiWord[] = {
 
 static const TParserStateActionItem actionTPS_InWord[] = {
 	{p_isEOF, 0, A_BINGO, TPS_Base, WORD_T, NULL},
+    {p_isCJK, 0, A_BINGO, TPS_Base, WORD_T, NULL},
 	{p_isalpha, 0, A_NEXT, TPS_Null, 0, NULL},
 	{p_isspecial, 0, A_NEXT, TPS_Null, 0, NULL},
 	{p_isdigit, 0, A_NEXT, TPS_InNumWord, 0, NULL},
@@ -1019,6 +1236,7 @@ static const TParserStateActionItem actionTPS_InWord[] = {
 
 static const TParserStateActionItem actionTPS_InUnsignedInt[] = {
 	{p_isEOF, 0, A_BINGO, TPS_Base, UNSIGNEDINT, NULL},
+    {p_isCJK, 0, A_BINGO, TPS_Base, UNSIGNEDINT, NULL},
 	{p_isdigit, 0, A_NEXT, TPS_Null, 0, NULL},
 	{p_iseqC, '.', A_PUSH, TPS_InHostFirstDomain, 0, NULL},
 	{p_iseqC, '.', A_PUSH, TPS_InUDecimalFirst, 0, NULL},
@@ -1051,6 +1269,7 @@ static const TParserStateActionItem actionTPS_InSignedInt[] = {
 
 static const TParserStateActionItem actionTPS_InSpace[] = {
 	{p_isEOF, 0, A_BINGO, TPS_Base, SPACE, NULL},
+    {p_isCJK, 0, A_BINGO, TPS_Base, SPACE, NULL},
 	{p_iseqC, '<', A_BINGO, TPS_Base, SPACE, NULL},
 	{p_isignore, 0, A_NEXT, TPS_Null, 0, NULL},
 	{p_iseqC, '-', A_BINGO, TPS_Base, SPACE, NULL},
@@ -1594,6 +1813,11 @@ static const TParserStateActionItem actionTPS_InHyphenUnsignedInt[] = {
 	{NULL, 0, A_POP, TPS_Null, 0, NULL}
 };
 
+static const TParserStateActionItem actionTPS_InCJK[] = {
+	{p_isEOF, 0, A_BINGO, TPS_Base, CJK_CHAR, NULL},
+	{NULL, 0, A_BINGO, TPS_Base, CJK_CHAR, NULL}
+};
+
 
 /*
  * main table of per-state parser actions
@@ -1696,7 +1920,8 @@ static const TParserStateAction Actions[] = {
 	TPARSERSTATEACTION(TPS_InHyphenWordPart),
 	TPARSERSTATEACTION(TPS_InHyphenAsciiWordPart),
 	TPARSERSTATEACTION(TPS_InHyphenNumWordPart),
-	TPARSERSTATEACTION(TPS_InHyphenUnsignedInt)
+	TPARSERSTATEACTION(TPS_InHyphenUnsignedInt),
+    TPARSERSTATEACTION(TPS_InCJK),
 };
 
 
@@ -1902,6 +2127,14 @@ prsd2_nexttoken(PG_FUNCTION_ARGS)
 
 	*t = p->token;
 	*tlen = p->lenbytetoken;
+    if (p->type == CJK_CHAR){
+        if (p_isCJK2gram_twice(p)){
+            //can current CJK char and the next char form a 2-gram token?
+			//we want to make sure CJK tokens are 2-gram if possible
+            *tlen += pg_mblen(p->str + p->state->posbyte);
+        }
+    }
+    
 
 	PG_RETURN_INT32(p->type);
 }
@@ -2437,7 +2670,7 @@ mark_hl_words(HeadlineParsedText *prs, TSQuery query, int highlight,
 }
 
 Datum
-prsd_headline(PG_FUNCTION_ARGS)
+prsd2_headline(PG_FUNCTION_ARGS)
 {
 	HeadlineParsedText *prs = (HeadlineParsedText *) PG_GETARG_POINTER(0);
 	List	   *prsoptions = (List *) PG_GETARG_POINTER(1);
