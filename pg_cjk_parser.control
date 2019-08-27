@@ -1,0 +1,4 @@
+comment = 'A token parser derived from pg default parser that parses CJK into 2-gram'
+default_version = '0.0.1'
+module_pathname = '$libdir/pg_cjk_parser'
+relocatable = true
