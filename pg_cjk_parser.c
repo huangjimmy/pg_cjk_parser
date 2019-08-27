@@ -41,7 +41,6 @@ PG_FUNCTION_INFO_V1(prsd2_lextype);
 
 /* Define me to enable tracing of parser behavior */
 /* #define WPARSER_TRACE */
-#define WPARSER_TRACE
 
 /* Output token categories */
 
