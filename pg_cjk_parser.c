@@ -572,7 +572,27 @@ p_isurlchar(TParser *prs)
 3400–4DBF	CJK Unified Ideographs Extension A	中日韓統一表意文字擴充A
 4DC0–4DFF	Yijing Hexagram Symbols	易經六十四卦象
 4E00–9FFF	CJK Unified Ideographs	中日韓統一表意文字
+
+1D300–1D35F	Tai Xuan Jing Symbols	太玄經符號
+
+20000–2A6DF	CJK Unified Ideographs Extension B	中日韓統一表意文字擴充B
+2A700–2B73F	CJK Unified Ideographs Extension C	中日韓統一表意文字擴充C
+2B740–2B81F	CJK Unified Ideographs Extension D	中日韓統一表意文字擴充D
+2B820–2CEAF	CJK Unified Ideographs Extension E	中日韓統一表意文字擴充E
+2CEB0–2EBEF	CJK Unified Ideographs Extension F	中日韓統一表意文字擴充F
+2F800–2FA1F	CJK Compatibility Ideographs Supplement	中日韓相容表意文字補充
  * */
+
+
+static int ext_code_plane_cjk[] = {
+	0x1D300, 0x1D35F,
+	0x20000, 0x2B73F,
+	0x2A700, 0x2B7F3,
+	0x2B740, 0x2B8EF,
+	0x2B820, 0x2CEAF,
+	0x2CEB9, 0x2EBEF,
+	0x2F800, 0x2FA1F,
+};
 
 static int
 p_isnotCJK(TParser *prs){
@@ -594,6 +614,15 @@ p_isnotCJK(TParser *prs){
         if (c >= 0x2E80 && c <= 0x9FFF){
             return 0;
         }
+		for(int i=0; i<7; i++){
+			if (c >= ext_code_plane_cjk[i*2] && c <= ext_code_plane_cjk[i*2+1]){
+#ifdef WPARSER_TRACE
+            fprintf(stderr, "%x is extended CJK [%x, %x]?", c, ext_code_plane_cjk[i*2], ext_code_plane_cjk[i*2+1]); fprintf(stderr, " = true\n");
+#endif
+				return 0;
+			}
+		}
+		
     }
     return 1;
 }
@@ -622,6 +651,14 @@ p_isCJK(TParser *prs){
 #endif
             return 1;
         }
+		for(int i=0; i<7; i++){
+			if (c >= ext_code_plane_cjk[i*2] && c <= ext_code_plane_cjk[i*2+1]){
+#ifdef WPARSER_TRACE
+            fprintf(stderr, "%x is extended CJK [%x, %x]?", c, ext_code_plane_cjk[i*2], ext_code_plane_cjk[i*2+1]); fprintf(stderr, " = true\n");
+#endif
+				return 1;
+			}
+		}
     }
     return 0;
 }
@@ -648,11 +685,6 @@ p_isCJK2gram(TParser *prs){
             //a 2-gram token
             return 1;
         }
-        else if (c >= 0x2E80 && c < 0x303F){
-            //other CJK, 
-            //one character per token
-            return 0;
-        }
     }
     return 0;
 }
@@ -661,7 +693,7 @@ static int
 p_isCJK2gram_twice(TParser *prs){
     
     pg_wchar	c;
-    int a, b;
+    pg_wchar a, b;
 
     /*
 	 * pg_dsplen could return -1 which means error or control character
@@ -676,11 +708,16 @@ p_isCJK2gram_twice(TParser *prs){
         }
 
         //p_isCJKchar only works in UTF8 encoding
-        if(((prs->token[0] ^ 0xE0) & 0xF0) != 0)return 0;//not CJK
-
-        a = ((prs->token[0] & 0xF)<<4) | ((prs->token[1]>>2) & 0xF);
-        b = ((prs->token[1] & 0x3)<<6) | (prs->token[2] & 0x3f);
-		c = ((a<<8) | b);
+        if(((prs->token[0] ^ 0xE0) & 0xF0) == 0 ){
+			//utf8 3 bytes per character, 1110
+			a = ((prs->token[0] & 0xF)<<4) | ((prs->token[1]>>2) & 0xF);
+			b = ((prs->token[1] & 0x3)<<6) | (prs->token[2] & 0x3f);
+			c = ((a<<8) | b);
+		}
+		else{
+			//non CJK or extended CJK
+			return 0;
+		}
 
         if (c >= 0x3040 && c <= 0x9FFF){
             //CJK Unified Ideographs
@@ -714,6 +751,7 @@ p_isCJK2gram_twice(TParser *prs){
 #endif
             return 0;
         }
+		//if control reaches here, that means either non-CJK or extended 4-byte CJK
     }
     return 0;
 }
@@ -760,9 +798,25 @@ p_isCJKunigram(TParser *prs){
 
     if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
         //p_isCJKchar only works in UTF8 encoding
+
+		if(((prs->token[0] ^ 0xF0) & 0xF8) == 0){
+			//could be a 4-byte CJK
+			a = ((prs->token[0] & 0x7)<<6) | ((prs->token[1]) & 0x3F);
+			b = ((prs->token[2] & 0x3F)<<6) | (prs->token[3] & 0x3F);
+			c = ((a<<12) | b);
+#ifdef WPARSER_TRACE
+				fprintf(stderr, "p_isCJKunigram: current char is a 4-byte char %x\n", c);
+#endif
+			for(int i=0; i<7; i++){
+				if (c >= ext_code_plane_cjk[i*2] && c <= ext_code_plane_cjk[i*2+1]){
+					return 1;
+				}
+			}
+		}
+
 		if(((prs->token[0] ^ 0xE0) & 0xF0) != 0){
 #ifdef WPARSER_TRACE
-				fprintf(stderr, "p_isCJKunigram: current char is not even CJK\n");
+				fprintf(stderr, "p_isCJKunigram: current char is not 3-byte CJK\n");
 #endif
 			return 0;//not CJK
 		}
