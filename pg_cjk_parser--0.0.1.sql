@@ -39,8 +39,8 @@ CREATE FUNCTION public.prsd2_cjk_headline(IN internal, IN internal, IN tsquery)
 AS 'MODULE_PATHNAME', 'prsd2_headline'
 ;
 
-CREATE FUNCTION public.cjk_zht2zhs(IN internal, IN internal, IN tsquery)
-    RETURNS internal
+CREATE FUNCTION public.cjk_zht2zhs(IN text)
+    RETURNS text
     LANGUAGE 'c' STRICT
     
 AS 'MODULE_PATHNAME', 'prsd2_zht2zhs'
