@@ -10,4 +10,5 @@ COPY pg_cjk_parser.c /root/parser/
 COPY pg_cjk_parser.control /root/parser/
 COPY Makefile /root/parser/
 COPY pg_cjk_parser--0.0.1.sql /root/parser/
+COPY zht2zhs.h /root/parser/
 RUN make clean && make install

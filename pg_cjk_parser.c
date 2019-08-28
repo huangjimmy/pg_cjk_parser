@@ -24,6 +24,8 @@
 #include "tsearch/ts_utils.h"
 #include "utils/builtins.h"
 
+#include "zht2zhs.h"
+
 
 Datum prsd2_start(PG_FUNCTION_ARGS);
 Datum prsd2_nexttoken(PG_FUNCTION_ARGS);
@@ -687,6 +689,48 @@ p_isCJK2gram(TParser *prs){
         }
     }
     return 0;
+}
+
+static unsigned int
+utf8_cjkCodePoint(char * s){
+	unsigned int c = *s;
+	unsigned int a, b;
+
+	if(((c ^ 0xE0) & 0xF0) == 0){
+		a = ((s[0] & 0xF)<<4) | ((s[1]>>2) & 0xF);
+		b = ((s[1] & 0x3)<<6) | (s[2] & 0x3f);
+		c = ((a<<8) | b);
+		return c;
+	}
+	if(((c ^ 0xF0) & 0xF8) == 0){
+		a = ((s[0] & 0x7)<<6) | ((s[1]) & 0x3F);
+		b = ((s[2] & 0x3F)<<6) | (s[3] & 0x3F);
+		c = ((a<<12) | b);
+	}
+
+	return 0;
+}
+
+static void 
+utf8_setCjkCodePoint(char * s, unsigned int codePoint){
+
+	if(codePoint >= 0x2E80 && codePoint <= 0x9FFF){
+		s[0] = 0xE0 | (codePoint>>12);
+		s[1] = 0x80 | ((codePoint>>6) & 0x3F);
+		s[2] = 0x80 | (codePoint & 0x3F);
+		return;
+	}
+
+	for(int i=0; i<7; i++){
+		if (codePoint >= ext_code_plane_cjk[i*2] && codePoint <= ext_code_plane_cjk[i*2+1]){
+			//four bytes
+			s[0] = 0xF0 | ((codePoint>>18) & 0x0F);
+			s[1] = 0x80 | ((codePoint>>12) & 0x3F);
+			s[2] = 0x80 | ((codePoint>>6) & 0x3F);
+			s[3] = 0x80 | (codePoint & 0x3F);
+			return;
+		}
+	}
 }
 
 static int
@@ -2889,4 +2933,57 @@ prsd2_headline(PG_FUNCTION_ARGS)
 	prs->fragdelimlen = strlen(prs->fragdelim);
 
 	PG_RETURN_POINTER(prs);
+}
+
+PG_FUNCTION_INFO_V1(prsd2_zht2zhs);
+
+Datum
+prsd2_zht2zhs(PG_FUNCTION_ARGS)
+{
+	text * zhs_text = PG_GETARG_TEXT_P_COPY(0);
+    int32 size = VARSIZE_ANY_EXHDR(zhs_text);
+	
+	int pos = 0;
+	char * cur = VARDATA(zhs_text);
+	
+	while(pos < size){
+		unsigned int cjk = utf8_cjkCodePoint(cur + pos);
+#ifdef WPARSER_TRACE
+        fprintf(stderr, "current char [%x] pos[%d]\n", cjk, pos); 
+#endif
+		if(cjk >= 0x346F && cjk <= 0x9FD3){
+			cjk = zht2zhs[cjk - 0x346F];
+#ifdef WPARSER_TRACE
+        	fprintf(stderr, "its zhs is %x\n", cjk); 
+#endif
+			utf8_setCjkCodePoint(cur + pos, cjk);
+			pos += 3;
+		}
+		else{
+			unsigned char c = *cur;
+			if(c < 128)pos++;
+			else if(((c ^ 0xC0) & 0xE0) == 0){
+				//110
+				pos += 2;
+			}
+			else if(((c ^ 0xE0) & 0xF0) == 0){
+				//1110
+				pos += 3;
+			}
+			else if(((c ^ 0xF0) & 0xF8) == 0){
+				///11110
+				pos += 4;
+			}
+			else if(((c ^ 0xF8) & 0xFC) == 0){
+				///1111 10
+				pos += 5;
+			}
+			else if(((c ^ 0xFC) & 0xFE) == 0){
+				///1111, 110
+				pos += 6;
+			}
+		}
+	}
+
+    PG_RETURN_TEXT_P(zhs_text);
 }
