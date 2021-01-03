@@ -1,6 +1,6 @@
-FROM postgres:11
+FROM postgres:13
 RUN apt-get update
-RUN apt-get install -y postgresql-server-dev-all
+RUN apt-get install -y postgresql-server-dev-13
 RUN apt-get install -y gcc
 RUN apt-get install -y icu-devtools libicu-dev
 
