@@ -2341,7 +2341,7 @@ typedef struct
 	int			len;
 } hlCheck;
 
-static bool
+static TSTernaryValue
 checkcondition_HL(void *opaque, QueryOperand *val, ExecPhraseData *data)
 {
 	int			i;
@@ -2353,7 +2353,7 @@ checkcondition_HL(void *opaque, QueryOperand *val, ExecPhraseData *data)
 		{
 			/* don't need to find all positions */
 			if (!data)
-				return true;
+				return TS_YES;
 
 			if (!data->pos)
 			{
@@ -2370,9 +2370,9 @@ checkcondition_HL(void *opaque, QueryOperand *val, ExecPhraseData *data)
 	}
 
 	if (data && data->npos > 0)
-		return true;
+		return TS_YES;
 
-	return false;
+	return TS_NO;
 }
 
 
