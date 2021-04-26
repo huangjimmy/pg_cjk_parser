@@ -83,7 +83,7 @@ Let's say that you have an instance of PostgreSQL 11 running, either on a docker
 Make sure you have the following dependencies installed.
 
 ```bash
-sudo apt-get install -y postgresql-server-dev-all
+sudo apt-get install -y postgresql-server-dev-13
 sudo apt-get install -y gcc
 sudo apt-get install -y icu-devtools libicu-dev
 ```
@@ -103,6 +103,7 @@ Run the following command on the server
 ```bash
 cd /home/user/parser
 make clean && make install
+sudo make USE_PGXS=1 install
 ```
 
 Connect to your server via pgAdmin or other clients and then execute the following sql to create the pg_cjk_parser extension.
