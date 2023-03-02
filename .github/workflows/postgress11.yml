@@ -16,7 +16,7 @@ jobs:
     - name: configure
       run: sudo apt-get install -y postgresql-server-dev-all gcc icu-devtools libicu-dev
     - name: debug
-      run: ls -l /usr/include/postgresql && pg_config --pgxs
+      run: ls -l /usr/include/postgresql && pg_config --pgxs && ls -l /usr/lib/postgresql
     - name: make
       run: make
     - name: make install
