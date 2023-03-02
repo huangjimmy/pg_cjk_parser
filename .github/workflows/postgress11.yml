@@ -1,0 +1,23 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    container: postgress:11
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: configure
+      run: apt-get install -y postgresql-server-dev-all && apt-get install -y gcc && apt-get install -y icu-devtools libicu-dev
+    - name: make
+      run: make
+    - name: make install
+      run: make install
+    
