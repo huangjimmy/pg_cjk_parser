@@ -10,7 +10,7 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    container: postgress:11
+    container: postgress:11-bullseye
 
     steps:
     - uses: actions/checkout@v3
