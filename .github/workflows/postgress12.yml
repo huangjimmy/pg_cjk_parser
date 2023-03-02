@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: Build pg_cjk_parser for postgres 12
 
 on:
   push:
