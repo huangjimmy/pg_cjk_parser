@@ -1,0 +1,24 @@
+name: Build pg_cjk_parser for postgres 12
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: uninstall postgresql-14
+      run: sudo apt-get remove -y postgresql-14 libpq-dev
+    - name: install dependencies
+      run: sudo apt-get install -y --allow-downgrades postgresql-12 postgresql-server-dev-12 libpq-dev libpq5=12.13-0ubuntu0.20.04.1 gcc icu-devtools libicu-dev
+    - name: make
+      run: make
+    - name: make install
+      run: sudo make install
+    
