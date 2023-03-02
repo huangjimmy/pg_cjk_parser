@@ -16,7 +16,7 @@ jobs:
     - name: uninstall postgresql-14
       run: sudo apt-get remove -y postgresql-14 libpq-dev
     - name: configure
-      run: sudo apt-get install -y postgresql-12 postgresql-server-dev-12 libpq-dev libpq5 gcc icu-devtools libicu-dev
+      run: sudo apt-get install -y postgresql-12 postgresql-server-dev-12 libpq-dev libpq5=12.13-0ubuntu0.20.04.1 gcc icu-devtools libicu-dev
     - name: debug
       run: ls -l /usr/include/postgresql && pg_config --pgxs && ls -l /usr/lib/postgresql
     - name: make
