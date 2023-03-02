@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: uninstall postgresql-14
-      run: sudo apt-get remove -y postgresql-14
+      run: sudo apt-get remove -y postgresql-14 libpq-dev
     - name: configure
       run: sudo apt-get install -y postgresql-12 postgresql-server-dev-all gcc icu-devtools libicu-dev
     - name: debug
