@@ -15,6 +15,8 @@ jobs:
     - uses: actions/checkout@v3
     - name: configure
       run: sudo apt-get install -y postgresql-server-dev-all gcc icu-devtools libicu-dev
+    - name: debug
+      run: ls -l /usr/include/postgresql
     - name: make
       run: make
     - name: make install
