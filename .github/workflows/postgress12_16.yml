@@ -61,5 +61,5 @@ jobs:
           tags: localhost:5000/postgres:16-dev
       -
         name: Run bash script to verify image postgres:16-dev
-        run: docker pull localhost:5000/postgres:6-dev && docker tag localhost:5000/postgres:16-dev postgres:16-dev && chmod +x ./postgres-16.sh && ./postgres-16.sh
+        run: docker pull localhost:5000/postgres:16-dev && docker tag localhost:5000/postgres:16-dev postgres:16-dev && chmod +x ./postgres-16.sh && ./postgres-16.sh
 
