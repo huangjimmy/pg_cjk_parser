@@ -1,6 +1,8 @@
 # Postgres CJK Parser - pg_cjk_parser
 
-Postgres CJK Parser pg_cjk_parser is a fts (full text search) parser derived from the default parser in PostgreSQL 11. When a postgres database uses utf-8 encoding, this parser supports all the features of the default parser while splitting CJK (Chinese, Japanese, Korean) characters into 2-gram tokens. If the database's encoding is not utf-8, the parser behaves just like the default parser.
+Postgres CJK Parser pg_cjk_parser is a fts (full text search) parser derived from the default parser in PostgreSQL. When a postgres database uses utf-8 encoding, this parser supports all the features of the default parser while splitting CJK (Chinese, Japanese, Korean) characters into 2-gram tokens. If the database's encoding is not utf-8, the parser behaves just like the default parser.
+
+Now pg_cjk_parser supports PostgreSQL 12 to 16.
 
 ## Introduction
 
@@ -59,16 +61,22 @@ You can build pg_cjk_parser in a docker container.
 
 1. Clone this repository into your local computer, say in /home/user/pg_cjk_parser
 2. Ener /home/user/pg_cjk_parser
-3. Build the docker image postgres:11-dev
+3. Build the docker image postgres:12-dev
 
+To build this extension for PostgreSQL 12
 ```bash
-docker build -t postgres:11-dev . 
+docker build -t postgres:12-dev . -f Dockerfile_pg12
+```
+
+To build this extension for PostgreSQL 16
+```bash
+docker build -t postgres:12-dev . -f Dockerfile_pg16
 ```
 
 4. Run the following command
 
 ```bash
-docker run -it --rm -v $(PWD):/root/code postgres:11-dev /bin/bash -c "cd /root/code && make clean && make"
+docker run -it --rm -v $(pwd):/root/code postgres:12-dev /bin/bash -c "cd /root/code && make clean && make"
 ```
 
 Then pg_cjk_parser.bc and pg_cjk_parser.so will be available in current directory (/home/user/pg_cjk_parser). You can manually install the parser to a PostgreSQL instances or you can install it as an extension.
@@ -79,11 +87,12 @@ You can manually install pg_cjk_parser or you can install it as an extension.
 
 ### Install as an extension
 
-Let's say that you have an instance of PostgreSQL 11 running, either on a docker container on a server.
+Let's say that you have an instance of PostgreSQL 12 running, either on a docker container on a server.
 Make sure you have the following dependencies installed.
 
 ```bash
-sudo apt-get install -y postgresql-server-dev-all
+# replace 12 with 16 if you build this extension for pg 16
+sudo apt-get install -y postgresql-server-dev-12 
 sudo apt-get install -y gcc
 sudo apt-get install -y icu-devtools libicu-dev
 ```
@@ -103,6 +112,7 @@ Run the following command on the server
 ```bash
 cd /home/user/parser
 make clean && make install
+sudo make USE_PGXS=1 install
 ```
 
 Connect to your server via pgAdmin or other clients and then execute the following sql to create the pg_cjk_parser extension.
@@ -132,13 +142,18 @@ Now you can execute the sql demonstrated in the introduction section to see the 
 
 ### Docker image
 
-There is a Dockerfile in this repository which helps you build a docker image based on postgres:11.
+There is a Dockerfile in this repository which helps you build a docker image based on postgres:12.
 
 ```bash
-docker build -t postgres:11-dev .
+docker build -t postgres:12-dev . -f Dockerfile_pg12
 ```
 
-If you use this image to start an instance of postgres:11, all you need to do is to create the extension, search parser and configuration in pgAdmin.
+There is also a Dockerfile in this repository which helps you build a docker image based on postgres:16.
+```bash
+docker build -t postgres:16-dev . -f Dockerfile_pg16
+```
+
+If you use this image to start an instance of postgres:12, all you need to do is to create the extension, search parser and configuration in pgAdmin.
 
 Connect to your server via pgAdmin or other clients and then execute the following sql to create the pg_cjk_parser extension.
 
@@ -167,10 +182,10 @@ Now you can execute the sql demonstrated in the introduction section to see the 
 
 ### Install manually
 
-Suppose you have an docker instance of postgres name postgres_db_1 whose image is postgres:11.
+Suppose you have an docker instance of postgres name postgres_db_1 whose image is postgres:12.
 
 ```bash
-docker cp pg_cjk_parser.so postgres_db_1:/usr/lib/postgresql/11/lib/
+docker cp pg_cjk_parser.so postgres_db_1:/usr/lib/postgresql/12/lib/
 ```
 
 Connect to the postgres instance via pgAdmin or other clients and then execute the following sql
@@ -334,6 +349,14 @@ to_tsvector('Doraemnon Nobita「ドラえもん のび太の牧場物語」多�
 |to_tsvector|to_tsquery|to_tsquery|?boolean?|?boolean?|
 |-|-|-|-|-|
 |'doraemnon':1 'nobita':2 'χψψωω':22 '「':3 '」':15 'えも':6 'のび':8 'の牧':11 'び太':9 'もん':7 'ドラ':4 'ラえ':5 '場物':13 '多拉':16 '大雄':21 '太の':10 '梦':18 '比大':20 '牧場':12 '物語':14 '野比':19|"'のび' & 'び太'"|"'野比' & '比大' & '大雄'"|true|true|
+
+```sql
+SELECT to_tsvector('大韩民国개인정보의 수집 및 이용 목적(「개인정보 보호법」 제15조)'), to_tsquery('「大韩民国개인정보');
+```
+
+|to_tsvector|to_tsquery|
+|-|-|
+| '15':21 '「':13 '」':19 '国개':4 '大韩':1 '民国':3 '韩民':2 '개인':5,14 '목적':12 '및':10 '보의':8 '보호':17 '수집':9 '이용':11 '인정':6,15 '정보':7,16 '제':20 '조':22 '호법':18|'「' & '大韩' & '韩民' & '民国' & '国개' & '개인' & '인정' & '정보'|
 
 ## License
 

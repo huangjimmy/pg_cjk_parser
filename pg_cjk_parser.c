@@ -613,7 +613,7 @@ p_isnotCJK(TParser *prs){
 		else
 			c = (pg_wchar) *(prs->wstr + prs->state->poschar);
 
-        if (c >= 0x2E80 && c <= 0x9FFF){
+        if ((c >= 0x2E80 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
             return 0;
         }
 		for(int i=0; i<7; i++){
@@ -647,7 +647,7 @@ p_isCJK(TParser *prs){
 			c = (pg_wchar) *(prs->wstr + prs->state->poschar);
 
         
-        if (c >= 0x2E80 && c <= 0x9FFF){
+        if ((c >= 0x2E80 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
 #ifdef WPARSER_TRACE
             fprintf(stderr, "%x isCJK?", c); fprintf(stderr, " = true\n");
 #endif
@@ -682,7 +682,7 @@ p_isCJK2gram(TParser *prs){
 		else
 			c = (pg_wchar) *(prs->wstr + prs->state->poschar);
 
-        if (c >= 0x3040 && c <= 0x9FFF){
+        if ((c >= 0x3040 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
             //CJK Unified Ideographs
             //a 2-gram token
             return 1;
@@ -714,7 +714,7 @@ utf8_cjkCodePoint(char * s){
 static void 
 utf8_setCjkCodePoint(char * s, unsigned int codePoint){
 
-	if(codePoint >= 0x2E80 && codePoint <= 0x9FFF){
+	if((codePoint >= 0x2E80 && codePoint <= 0x9FFF) || (codePoint >= 0xAC00 && codePoint <= 0xD7A3)){
 		s[0] = 0xE0 | (codePoint>>12);
 		s[1] = 0x80 | ((codePoint>>6) & 0x3F);
 		s[2] = 0x80 | (codePoint & 0x3F);
@@ -763,7 +763,7 @@ p_isCJK2gram_twice(TParser *prs){
 			return 0;
 		}
 
-        if (c >= 0x3040 && c <= 0x9FFF){
+        if ((c >= 0x3040 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
             //CJK Unified Ideographs
             //token as if it is a 2-gram
             pg_wchar nc;
@@ -772,7 +772,7 @@ p_isCJK2gram_twice(TParser *prs){
             else
                 nc = (pg_wchar) *(prs->wstr + prs->state->poschar);
 
-            if (nc >= 0x3040 && nc <= 0x9FFF){
+            if ((nc >= 0x3040 && nc <= 0x9FFF) || (nc >= 0xAC00 && nc <= 0xD7A3)){
 #ifdef WPARSER_TRACE
                 fprintf(stderr, " %x %x is 2-gram state=", c, nc);
                 fprintf(stderr, "%d \n", prs->state->state);
@@ -873,7 +873,7 @@ p_isCJKunigram(TParser *prs){
 				fprintf(stderr, "p_isCJKunigram: current char = %x\n", c);
 #endif
 
-        if (c >= 0x3040 && c <= 0x9FFF){
+        if ((c >= 0x3040 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
             //CJK Unified Ideographs
 			//if it is surrounded by non-CJK chars or CJK unigrams,
 			//it is also unigram
@@ -886,12 +886,12 @@ p_isCJKunigram(TParser *prs){
 #ifdef WPARSER_TRACE
 				fprintf(stderr, "p_isCJKunigram: next char = %x\n", c);
 #endif
-			if(c < 0x3040|| c > 0x9FFF){
+			if( !((c >= 0x3040 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)) ){
 				c = p_prevChar(prs);
 #ifdef WPARSER_TRACE
 				fprintf(stderr, "p_isCJKunigram: prev char = %x\n", c);
 #endif
-				if(c < 0x3040 || c > 0x9FFF)return 1;
+				if( !((c >= 0x3040 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)) )return 1;
 			}
             return 0;
         }
@@ -2341,19 +2341,37 @@ typedef struct
 	int			len;
 } hlCheck;
 
-static bool
+#ifndef PG_VERSION_NUM
+	#error "Cannot determine which postgresql version to build against"
+#endif
+
+#if PG_VERSION_NUM < 130000
+	#define TSTernaryValue bool
+	#define TS_YES true
+	#define TS_NO false
+#endif
+
+/*
+ * TS_execute callback for matching a tsquery operand to headline words
+ *
+ * Note: it's tempting to report words[] indexes as pos values to save
+ * searching in hlCover; but that would screw up phrase matching, which
+ * expects to measure distances in lexemes not tokens.
+ */
+static TSTernaryValue
 checkcondition_HL(void *opaque, QueryOperand *val, ExecPhraseData *data)
 {
-	int			i;
 	hlCheck    *checkval = (hlCheck *) opaque;
+	int			i;
 
+	/* scan words array for matching items */
 	for (i = 0; i < checkval->len; i++)
 	{
 		if (checkval->words[i].item == val)
 		{
-			/* don't need to find all positions */
+			/* if data == NULL, don't need to report positions */
 			if (!data)
-				return true;
+				return TS_YES;
 
 			if (!data->pos)
 			{
@@ -2370,9 +2388,9 @@ checkcondition_HL(void *opaque, QueryOperand *val, ExecPhraseData *data)
 	}
 
 	if (data && data->npos > 0)
-		return true;
+		return TS_YES;
 
-	return false;
+	return TS_NO;
 }
 
 
@@ -2869,13 +2887,13 @@ prsd2_headline(PG_FUNCTION_ARGS)
 		char	   *val = defGetString(defel);
 
 		if (pg_strcasecmp(defel->defname, "MaxWords") == 0)
-			max_words = pg_atoi(val, sizeof(int32), 0);
+			max_words = pg_strtoint32(val);
 		else if (pg_strcasecmp(defel->defname, "MinWords") == 0)
-			min_words = pg_atoi(val, sizeof(int32), 0);
+			min_words = pg_strtoint32(val);
 		else if (pg_strcasecmp(defel->defname, "ShortWord") == 0)
-			shortword = pg_atoi(val, sizeof(int32), 0);
+			shortword = pg_strtoint32(val);
 		else if (pg_strcasecmp(defel->defname, "MaxFragments") == 0)
-			max_fragments = pg_atoi(val, sizeof(int32), 0);
+			max_fragments = pg_strtoint32(val);
 		else if (pg_strcasecmp(defel->defname, "StartSel") == 0)
 			prs->startsel = pstrdup(val);
 		else if (pg_strcasecmp(defel->defname, "StopSel") == 0)
