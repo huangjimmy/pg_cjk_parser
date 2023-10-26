@@ -23,9 +23,10 @@ jobs:
           push: false
           file: Dockerfile_pg12
           tags: postgres:12-dev
+      - uses: actions/checkout@v3
       -
         name: Run bash script to verify image postgres:12-dev
-        run: pwd && ls -l .. && chmod +x ../postgres-12.sh && ../postgres-12.sh
+        run: pwd && ls -l && chmod +x ./postgres-12.sh && ./postgres-12.sh
 
   build_pg16:
     runs-on: ubuntu-latest
@@ -43,7 +44,8 @@ jobs:
           push: false
           file: Dockerfile_pg16
           tags: postgres:16-dev
+      - uses: actions/checkout@v3
       -
         name: Run bash script to verify image postgres:16-dev
-        run: pwd && ls -l .. && chmod +x ../postgres-16.sh && ../postgres-16.sh
+        run: pwd && ls -l  && chmod +x ./postgres-16.sh && ./postgres-16.sh
 
