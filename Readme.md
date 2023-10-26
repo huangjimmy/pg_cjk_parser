@@ -2,7 +2,7 @@
 
 Postgres CJK Parser pg_cjk_parser is a fts (full text search) parser derived from the default parser in PostgreSQL. When a postgres database uses utf-8 encoding, this parser supports all the features of the default parser while splitting CJK (Chinese, Japanese, Korean) characters into 2-gram tokens. If the database's encoding is not utf-8, the parser behaves just like the default parser.
 
-Now pg_cjk_parser supports PostgreSQL 11 to 16.
+Now pg_cjk_parser supports PostgreSQL 12 to 16.
 
 ## Introduction
 
@@ -153,7 +153,7 @@ There is also a Dockerfile in this repository which helps you build a docker ima
 docker build -t postgres:16-dev . -f Dockerfile_pg16
 ```
 
-If you use this image to start an instance of postgres:11, all you need to do is to create the extension, search parser and configuration in pgAdmin.
+If you use this image to start an instance of postgres:12, all you need to do is to create the extension, search parser and configuration in pgAdmin.
 
 Connect to your server via pgAdmin or other clients and then execute the following sql to create the pg_cjk_parser extension.
 
@@ -182,10 +182,10 @@ Now you can execute the sql demonstrated in the introduction section to see the 
 
 ### Install manually
 
-Suppose you have an docker instance of postgres name postgres_db_1 whose image is postgres:11.
+Suppose you have an docker instance of postgres name postgres_db_1 whose image is postgres:12.
 
 ```bash
-docker cp pg_cjk_parser.so postgres_db_1:/usr/lib/postgresql/11/lib/
+docker cp pg_cjk_parser.so postgres_db_1:/usr/lib/postgresql/12/lib/
 ```
 
 Connect to the postgres instance via pgAdmin or other clients and then execute the following sql
