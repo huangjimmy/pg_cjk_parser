@@ -9,43 +9,57 @@ on:
 jobs:
   build_pg12:
     runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     steps:
+      - uses: actions/checkout@v4
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
       -
         name: Build and push
         uses: docker/build-push-action@v5
         with:
-          push: false
+          push: true
           file: Dockerfile_pg12
-          tags: postgres:12-dev
-      - uses: actions/checkout@v3
+          tags: localhost:5000/postgres:12-dev
       -
         name: Run bash script to verify image postgres:12-dev
-        run: pwd && ls -l && chmod +x ./postgres-12.sh && ./postgres-12.sh
+        run: docker pull localhost:5000/postgres:12-dev && docker tag localhost:5000/postgres:12-dev postgres:12-dev && chmod +x ./postgres-12.sh && ./postgres-12.sh
 
   build_pg16:
     runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     steps:
+      - uses: actions/checkout@v4
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
       -
         name: Build and push
         uses: docker/build-push-action@v5
         with:
-          push: false
+          push: true
           file: Dockerfile_pg16
-          tags: postgres:16-dev
-      - uses: actions/checkout@v3
+          tags: localhost:5000/postgres:16-dev
       -
         name: Run bash script to verify image postgres:16-dev
-        run: pwd && ls -l  && chmod +x ./postgres-16.sh && ./postgres-16.sh
+        run: docker pull localhost:5000/postgres:6-dev && docker tag localhost:5000/postgres:16-dev postgres:16-dev && chmod +x ./postgres-16.sh && ./postgres-16.sh
 
