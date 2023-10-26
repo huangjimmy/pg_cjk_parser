@@ -1,4 +1,4 @@
-name: Build pg_cjk_parser for postgres 12
+name: Build pg_cjk_parser for postgres 12 and 16
 
 on:
   push:
@@ -7,18 +7,42 @@ on:
     branches: [ "master" ]
 
 jobs:
-  build:
-
-    runs-on: ubuntu-20.04
-
+  build_pg12:
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: uninstall postgresql-14
-      run: sudo apt-get remove -y postgresql-14 libpq-dev
-    - name: install dependencies
-      run: sudo apt-get install -y --allow-downgrades postgresql-12 postgresql-server-dev-12 libpq-dev libpq5=12.13-0ubuntu0.20.04.1 gcc icu-devtools libicu-dev
-    - name: make
-      run: make
-    - name: make install
-      run: sudo make install
-    
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      -
+        name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: false
+          file: Dockerfile_pg12
+          tags: postgres:12-dev
+      -
+        name: Run bash script to verify image postgres:12-dev
+        run: ./postgres-12.sh
+
+  build_pg16:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      -
+        name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: false
+          file: Dockerfile_pg16
+          tags: postgres:16-dev
+      -
+        name: Run bash script to verify image postgres:16-dev
+        run: ./postgres-16.sh
