@@ -1,6 +1,8 @@
 # Postgres CJK Parser - pg_cjk_parser
 
-Postgres CJK Parser pg_cjk_parser is a fts (full text search) parser derived from the default parser in PostgreSQL 11. When a postgres database uses utf-8 encoding, this parser supports all the features of the default parser while splitting CJK (Chinese, Japanese, Korean) characters into 2-gram tokens. If the database's encoding is not utf-8, the parser behaves just like the default parser.
+Postgres CJK Parser pg_cjk_parser is a fts (full text search) parser derived from the default parser in PostgreSQL. When a postgres database uses utf-8 encoding, this parser supports all the features of the default parser while splitting CJK (Chinese, Japanese, Korean) characters into 2-gram tokens. If the database's encoding is not utf-8, the parser behaves just like the default parser.
+
+Now pg_cjk_parser supports PostgreSQL 11 to 16.
 
 ## Introduction
 
