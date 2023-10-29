@@ -1,8 +1,5 @@
-FROM postgres:12
-RUN apt-get update
-RUN apt-get install -y postgresql-server-dev-12
-RUN apt-get install -y gcc make
-RUN apt-get install -y icu-devtools libicu-dev
+FROM postgres:12 as build
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-server-dev-12 gcc make icu-devtools libicu-dev
 
 RUN mkdir -p /root/parser
 WORKDIR /root/parser
@@ -12,3 +9,9 @@ COPY Makefile /root/parser/
 COPY pg_cjk_parser--0.0.1.sql /root/parser/
 COPY zht2zhs.h /root/parser/
 RUN make clean && make install
+
+FROM postgres:12
+COPY --from=build /root/parser/pg_cjk_parser.bc /usr/lib/postgresql/12/lib/bitcode
+COPY --from=build /root/parser/pg_cjk_parser.so /usr/lib/postgresql/12/lib
+COPY --from=build /root/parser/pg_cjk_parser--0.0.1.sql /usr/share/postgresql/12/extension
+COPY --from=build /root/parser/pg_cjk_parser.control /usr/share/postgresql/12/extension
