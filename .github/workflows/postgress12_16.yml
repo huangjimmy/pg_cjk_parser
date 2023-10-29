@@ -7,7 +7,7 @@ on:
     branches: [ "master" ]
 
 jobs:
-  PostgreSQL 11:
+  PostgreSQL-11:
     runs-on: ubuntu-latest
     services:
       registry:
@@ -35,7 +35,7 @@ jobs:
         name: Run bash script to verify image postgres:11-dev
         run: docker pull localhost:5000/postgres:11-dev && docker tag localhost:5000/postgres:11-dev postgres:11-dev && chmod +x ./postgres-11.sh && ./postgres-11.sh
 
-  PostgreSQL 12:
+  PostgreSQL-12:
     runs-on: ubuntu-latest
     services:
       registry:
@@ -65,7 +65,7 @@ jobs:
         name: Run bash script to verify image postgres:12-dev
         run: docker pull localhost:5000/postgres:12-dev && docker tag localhost:5000/postgres:12-dev postgres:12-dev && chmod +x ./postgres-12.sh && ./postgres-12.sh
 
-  PostgreSQL 16:
+  PostgreSQL-16:
     runs-on: ubuntu-latest
     services:
       registry:
