@@ -29,7 +29,9 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          file: Dockerfile_pg12
+          build-args: POSTGRES_VERSION=12
+          file: Dockerfile
+
           tags: localhost:5000/postgres:12-dev
       -
         name: Run bash script to verify image postgres:12-dev
@@ -57,7 +59,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          file: Dockerfile_pg16
+          build-args: POSTGRES_VERSION=16
+          file: Dockerfile
           tags: localhost:5000/postgres:16-dev
       -
         name: Run bash script to verify image postgres:16-dev
