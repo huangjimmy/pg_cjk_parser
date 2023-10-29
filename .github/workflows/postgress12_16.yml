@@ -92,7 +92,7 @@ jobs:
           tags: localhost:5000/postgres:dev
       -
         name: Run bash script to verify image postgres:dev
-        run: docker pull localhost:5000/postgres:dev && docker tag localhost:5000/postgres:dev postgres:dev && chmod +x ./postgres-1x.sh && ./postgres-1x.sh
+        run: docker pull localhost:5000/postgres:dev && docker tag localhost:5000/postgres:dev postgres:12-dev && chmod +x ./postgres-12.sh && ./postgres-12.sh
         
   PostgreSQL-14:
     runs-on: ubuntu-latest
