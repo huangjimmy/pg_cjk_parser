@@ -2351,6 +2351,10 @@ typedef struct
 	#define TS_NO false
 #endif
 
+#if PG_VERSION_NUM < 120000
+#define pg_strtoint32(val) pg_atoi(val, sizeof(int32), 0)
+#endif
+
 /*
  * TS_execute callback for matching a tsquery operand to headline words
  *

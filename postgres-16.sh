@@ -74,4 +74,5 @@ then
     docker stop postgres16 && docker rm postgres16
     exit 1
 fi
+
 docker stop postgres16 && docker rm postgres16
