@@ -1,4 +1,4 @@
-name: Build pg_cjk_parser for postgres 12 and 16
+name: Build and verify pg_cjk_parser for
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ "master" ]
 
 jobs:
-  build_pg12:
+  PostgreSQL-11:
     runs-on: ubuntu-latest
     services:
       registry:
@@ -29,13 +29,43 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          file: Dockerfile_pg12
+          file: Dockerfile_pg11
+          tags: localhost:5000/postgres:11-dev
+      -
+        name: Run bash script to verify image postgres:11-dev
+        run: docker pull localhost:5000/postgres:11-dev && docker tag localhost:5000/postgres:11-dev postgres:11-dev && chmod +x ./postgres-11.sh && ./postgres-11.sh
+
+  PostgreSQL-12:
+    runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    steps:
+      - uses: actions/checkout@v4
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+      -
+        name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          build-args: POSTGRES_VERSION=12
+          file: Dockerfile_alpine
+
           tags: localhost:5000/postgres:12-dev
       -
         name: Run bash script to verify image postgres:12-dev
         run: docker pull localhost:5000/postgres:12-dev && docker tag localhost:5000/postgres:12-dev postgres:12-dev && chmod +x ./postgres-12.sh && ./postgres-12.sh
 
-  build_pg16:
+  PostgreSQL-13:
     runs-on: ubuntu-latest
     services:
       registry:
@@ -57,7 +87,95 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          file: Dockerfile_pg16
+          build-args: POSTGRES_VERSION=13
+          file: Dockerfile_alpine
+          tags: localhost:5000/postgres:dev
+      -
+        name: Run bash script to verify image postgres:dev
+        run: docker pull localhost:5000/postgres:dev && docker tag localhost:5000/postgres:dev postgres:12-dev && chmod +x ./postgres-12.sh && ./postgres-12.sh
+        
+  PostgreSQL-14:
+    runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    steps:
+      - uses: actions/checkout@v4
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+      -
+        name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          build-args: POSTGRES_VERSION=14
+          file: Dockerfile_alpine
+          tags: localhost:5000/postgres:dev
+      -
+        name: Run bash script to verify image postgres:dev
+        run: docker pull localhost:5000/postgres:dev && docker tag localhost:5000/postgres:dev postgres:dev && chmod +x ./postgres-1x.sh && ./postgres-1x.sh
+
+  PostgreSQL-15:
+    runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    steps:
+      - uses: actions/checkout@v4
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+      -
+        name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          build-args: POSTGRES_VERSION=15
+          file: Dockerfile_alpine
+          tags: localhost:5000/postgres:dev
+      -
+        name: Run bash script to verify image postgres:dev
+        run: docker pull localhost:5000/postgres:dev && docker tag localhost:5000/postgres:dev postgres:dev && chmod +x ./postgres-1x.sh && ./postgres-1x.sh
+
+  PostgreSQL-16:
+    runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    steps:
+      - uses: actions/checkout@v4
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+      -
+        name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          build-args: POSTGRES_VERSION=16
+          file: Dockerfile_alpine
           tags: localhost:5000/postgres:16-dev
       -
         name: Run bash script to verify image postgres:16-dev

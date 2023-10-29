@@ -65,12 +65,17 @@ You can build pg_cjk_parser in a docker container.
 
 To build this extension for PostgreSQL 12
 ```bash
-docker build -t postgres:12-dev . -f Dockerfile_pg12
+docker build -t postgres:12-dev . --build-arg POSTGRES_VERSION=12 -f Dockerfile_alpine
 ```
 
 To build this extension for PostgreSQL 16
 ```bash
-docker build -t postgres:12-dev . -f Dockerfile_pg16
+docker build -t postgres:16-dev . --build-arg POSTGRES_VERSION=16 -f Dockerfile_alpine
+```
+
+To build this extension for PostgreSQL 11
+```bash
+docker build -t postgres:11-dev . -f Dockerfile_pg11
 ```
 
 4. Run the following command
@@ -145,12 +150,17 @@ Now you can execute the sql demonstrated in the introduction section to see the 
 There is a Dockerfile in this repository which helps you build a docker image based on postgres:12.
 
 ```bash
-docker build -t postgres:12-dev . -f Dockerfile_pg12
+docker build -t postgres:12-dev . --build-arg POSTGRES_VERSION=12 -f Dockerfile_alpine
 ```
 
-There is also a Dockerfile in this repository which helps you build a docker image based on postgres:16.
+or you can build a docker image based on postgres:16.
 ```bash
-docker build -t postgres:16-dev . -f Dockerfile_pg16
+docker build -t postgres:16-dev . --build-arg POSTGRES_VERSION=16 -f Dockerfile_alpine
+```
+
+or you can build a docker image based on postgres:11.
+```bash
+docker build -t postgres:11-dev . -f Dockerfile_pg11
 ```
 
 If you use this image to start an instance of postgres:12, all you need to do is to create the extension, search parser and configuration in pgAdmin.
