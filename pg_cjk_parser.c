@@ -98,7 +98,7 @@ static const char *const tok_alias[] = {
 	"int",
 	"uint",
 	"entity",
-    "cjk"
+	"cjk"
 };
 
 static const char *const lex_descr[] = {
@@ -126,7 +126,7 @@ static const char *const lex_descr[] = {
 	"Signed integer",
 	"Unsigned integer",
 	"XML entity",
-    "CJK Char"
+	"CJK Char"
 };
 
 
@@ -211,7 +211,7 @@ typedef enum
 	TPS_InHyphenAsciiWordPart,
 	TPS_InHyphenNumWordPart,
 	TPS_InHyphenUnsignedInt,
-    TPS_InCJK,
+	TPS_InCJK,
 	TPS_Null					/* last state (fake value) */
 } TParserState;
 
@@ -598,97 +598,97 @@ static int ext_code_plane_cjk[] = {
 
 static int
 p_isnotCJK(TParser *prs){
-    /*
+	/*
 	 * pg_dsplen could return -1 which means error or control character
 	 */
 	if (pg_dsplen(prs->str + prs->state->posbyte) == 0)
 		return 1;
 
-    if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
-        //p_isCJKchar only works in UTF8 encoding
-        pg_wchar	c;
+	if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
+		//p_isCJKchar only works in UTF8 encoding
+		pg_wchar	c;
 
 		if (prs->pgwstr)
 			c = *(prs->pgwstr + prs->state->poschar);
 		else
 			c = (pg_wchar) *(prs->wstr + prs->state->poschar);
 
-        if ((c >= 0x2E80 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
-            return 0;
-        }
+		if ((c >= 0x2E80 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
+			return 0;
+		}
 		for(int i=0; i<7; i++){
 			if (c >= ext_code_plane_cjk[i*2] && c <= ext_code_plane_cjk[i*2+1]){
 #ifdef WPARSER_TRACE
-            fprintf(stderr, "%x is extended CJK [%x, %x]?", c, ext_code_plane_cjk[i*2], ext_code_plane_cjk[i*2+1]); fprintf(stderr, " = true\n");
+			fprintf(stderr, "%x is extended CJK [%x, %x]?", c, ext_code_plane_cjk[i*2], ext_code_plane_cjk[i*2+1]); fprintf(stderr, " = true\n");
 #endif
 				return 0;
 			}
 		}
 		
-    }
-    return 1;
+	}
+	return 1;
 }
 
 static int
 p_isCJK(TParser *prs){
-    /*
+	/*
 	 * pg_dsplen could return -1 which means error or control character
 	 */
 	if (pg_dsplen(prs->str + prs->state->posbyte) == 0)
 		return 0;
 
-    if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
-        //p_isCJKchar only works in UTF8 encoding
-        pg_wchar	c;
+	if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
+		//p_isCJKchar only works in UTF8 encoding
+		pg_wchar	c;
 
 		if (prs->pgwstr)
 			c = *(prs->pgwstr + prs->state->poschar);
 		else
 			c = (pg_wchar) *(prs->wstr + prs->state->poschar);
 
-        
-        if ((c >= 0x2E80 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
+		
+		if ((c >= 0x2E80 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
 #ifdef WPARSER_TRACE
-            fprintf(stderr, "%x isCJK?", c); fprintf(stderr, " = true\n");
+			fprintf(stderr, "%x isCJK?", c); fprintf(stderr, " = true\n");
 #endif
-            return 1;
-        }
+			return 1;
+		}
 		for(int i=0; i<7; i++){
 			if (c >= ext_code_plane_cjk[i*2] && c <= ext_code_plane_cjk[i*2+1]){
 #ifdef WPARSER_TRACE
-            fprintf(stderr, "%x is extended CJK [%x, %x]?", c, ext_code_plane_cjk[i*2], ext_code_plane_cjk[i*2+1]); fprintf(stderr, " = true\n");
+			fprintf(stderr, "%x is extended CJK [%x, %x]?", c, ext_code_plane_cjk[i*2], ext_code_plane_cjk[i*2+1]); fprintf(stderr, " = true\n");
 #endif
 				return 1;
 			}
 		}
-    }
-    return 0;
+	}
+	return 0;
 }
 
 static int
 p_isCJK2gram(TParser *prs){
-    /*
+	/*
 	 * pg_dsplen could return -1 which means error or control character
 	 */
 	if (pg_dsplen(prs->str + prs->state->posbyte) == 0)
 		return 0;
 
-    if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
-        //p_isCJKchar only works in UTF8 encoding
-        pg_wchar	c;
+	if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
+		//p_isCJKchar only works in UTF8 encoding
+		pg_wchar	c;
 
 		if (prs->pgwstr)
 			c = *(prs->pgwstr + prs->state->poschar);
 		else
 			c = (pg_wchar) *(prs->wstr + prs->state->poschar);
 
-        if ((c >= 0x3040 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
-            //CJK Unified Ideographs
-            //a 2-gram token
-            return 1;
-        }
-    }
-    return 0;
+		if ((c >= 0x3040 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
+			//CJK Unified Ideographs
+			//a 2-gram token
+			return 1;
+		}
+	}
+	return 0;
 }
 
 static unsigned int
@@ -735,24 +735,24 @@ utf8_setCjkCodePoint(char * s, unsigned int codePoint){
 
 static int
 p_isCJK2gram_twice(TParser *prs){
-    
-    pg_wchar	c;
-    pg_wchar a, b;
+	
+	pg_wchar	c;
+	pg_wchar a, b;
 
-    /*
+	/*
 	 * pg_dsplen could return -1 which means error or control character
 	 */
 	if (pg_dsplen(prs->str + prs->state->posbyte) == 0)
 		return 0;
 
-    if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
+	if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
 
-        if(prs->state->posbyte > prs->lenstr){
-            return 0;
-        }
+		if(prs->state->posbyte > prs->lenstr){
+			return 0;
+		}
 
-        //p_isCJKchar only works in UTF8 encoding
-        if(((prs->token[0] ^ 0xE0) & 0xF0) == 0 ){
+		//p_isCJKchar only works in UTF8 encoding
+		if(((prs->token[0] ^ 0xE0) & 0xF0) == 0 ){
 			//utf8 3 bytes per character, 1110
 			a = ((prs->token[0] & 0xF)<<4) | ((prs->token[1]>>2) & 0xF);
 			b = ((prs->token[1] & 0x3)<<6) | (prs->token[2] & 0x3f);
@@ -763,41 +763,41 @@ p_isCJK2gram_twice(TParser *prs){
 			return 0;
 		}
 
-        if ((c >= 0x3040 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
-            //CJK Unified Ideographs
-            //token as if it is a 2-gram
-            pg_wchar nc;
-            if (prs->pgwstr)
-                nc = *(prs->pgwstr + prs->state->poschar);
-            else
-                nc = (pg_wchar) *(prs->wstr + prs->state->poschar);
+		if ((c >= 0x3040 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
+			//CJK Unified Ideographs
+			//token as if it is a 2-gram
+			pg_wchar nc;
+			if (prs->pgwstr)
+				nc = *(prs->pgwstr + prs->state->poschar);
+			else
+				nc = (pg_wchar) *(prs->wstr + prs->state->poschar);
 
-            if ((nc >= 0x3040 && nc <= 0x9FFF) || (nc >= 0xAC00 && nc <= 0xD7A3)){
+			if ((nc >= 0x3040 && nc <= 0x9FFF) || (nc >= 0xAC00 && nc <= 0xD7A3)){
 #ifdef WPARSER_TRACE
-                fprintf(stderr, " %x %x is 2-gram state=", c, nc);
-                fprintf(stderr, "%d \n", prs->state->state);
+				fprintf(stderr, " %x %x is 2-gram state=", c, nc);
+				fprintf(stderr, "%d \n", prs->state->state);
 #endif
-                return 1;
-            }
+				return 1;
+			}
 #ifdef WPARSER_TRACE
-                fprintf(stderr, " %x %x is not 2-gram state=", c, nc);
-                fprintf(stderr, "%d \n", prs->state->state);
+				fprintf(stderr, " %x %x is not 2-gram state=", c, nc);
+				fprintf(stderr, "%d \n", prs->state->state);
 #endif
-            return 0;
+			return 0;
 
-        }
-        else if (c >= 0x2E80 && c < 0x3040){
-            //other CJK, 
-            //one character per token
+		}
+		else if (c >= 0x2E80 && c < 0x3040){
+			//other CJK, 
+			//one character per token
 #ifdef WPARSER_TRACE
-                fprintf(stderr, " %x is unigram state=", c);
-                fprintf(stderr, "%d \n", prs->state->state);
+				fprintf(stderr, " %x is unigram state=", c);
+				fprintf(stderr, "%d \n", prs->state->state);
 #endif
-            return 0;
-        }
+			return 0;
+		}
 		//if control reaches here, that means either non-CJK or extended 4-byte CJK
-    }
-    return 0;
+	}
+	return 0;
 }
 
 
@@ -840,8 +840,8 @@ p_isCJKunigram(TParser *prs){
 	fprintf(stderr, "p_isCJKunigram: enter\n");
 #endif
 
-    if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
-        //p_isCJKchar only works in UTF8 encoding
+	if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide) {
+		//p_isCJKchar only works in UTF8 encoding
 
 		if(((prs->token[0] ^ 0xF0) & 0xF8) == 0){
 			//could be a 4-byte CJK
@@ -865,16 +865,16 @@ p_isCJKunigram(TParser *prs){
 			return 0;//not CJK
 		}
 
-        a = ((prs->token[0] & 0xF)<<4) | ((prs->token[1]>>2) & 0xF);
-        b = ((prs->token[1] & 0x3)<<6) | (prs->token[2] & 0x3f);
+		a = ((prs->token[0] & 0xF)<<4) | ((prs->token[1]>>2) & 0xF);
+		b = ((prs->token[1] & 0x3)<<6) | (prs->token[2] & 0x3f);
 		c = ((a<<8) | b);
 
 #ifdef WPARSER_TRACE
 				fprintf(stderr, "p_isCJKunigram: current char = %x\n", c);
 #endif
 
-        if ((c >= 0x3040 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
-            //CJK Unified Ideographs
+		if ((c >= 0x3040 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)){
+			//CJK Unified Ideographs
 			//if it is surrounded by non-CJK chars or CJK unigrams,
 			//it is also unigram
 			//1. check whether previous char is CJK 3000 to 9FFF
@@ -893,22 +893,21 @@ p_isCJKunigram(TParser *prs){
 #endif
 				if( !((c >= 0x3040 && c <= 0x9FFF) || (c >= 0xAC00 && c <= 0xD7A3)) )return 1;
 			}
-            return 0;
-        }
-        else if (c >= 0x2E80 && c < 0x3040){
-            //other CJK, 
-            //one character per token
+			return 0;
+		}
+		else if (c >= 0x2E80 && c < 0x3040){
+			//other CJK, 
+			//one character per token
 #ifdef WPARSER_TRACE
 				fprintf(stderr, "p_isCJKunigram: unigram detected\n");
 #endif
-            return 1;
-        }
-        
-    }
+			return 1;
+		}
+	}
 #ifdef WPARSER_TRACE
 				fprintf(stderr, "p_isCJKunigram: exit database not PG_UTF8\n");
 #endif
-    return 0;
+	return 0;
 }
 
 /* deliberately suppress unused-function complaints for the above */
@@ -938,11 +937,11 @@ _make_compiler_happy(void)
 	p_iseqC(NULL);
 	p_isneC(NULL);
 
-    p_isCJK2gram(NULL);
-    p_isCJK2gram_twice(NULL);
-    p_isCJKunigram(NULL);
-    p_isCJK(NULL);
-    p_isnotCJK(NULL);
+	p_isCJK2gram(NULL);
+	p_isCJK2gram_twice(NULL);
+	p_isCJKunigram(NULL);
+	p_isCJK(NULL);
+	p_isnotCJK(NULL);
 }
 
 
@@ -1344,7 +1343,7 @@ p_isspecial(TParser *prs)
 
 static const TParserStateActionItem actionTPS_Base[] = {
 	{p_isEOF, 0, A_NEXT, TPS_Null, 0, NULL},
-    {p_isCJK, 0, A_NEXT, TPS_InCJK, 0, NULL}, 
+	{p_isCJK, 0, A_NEXT, TPS_InCJK, 0, NULL}, 
 	{p_iseqC, '<', A_PUSH, TPS_InTagFirst, 0, NULL},
 	{p_isignore, 0, A_NEXT, TPS_InSpace, 0, NULL},
 	{p_isasclet, 0, A_NEXT, TPS_InAsciiWord, 0, NULL},
@@ -1362,7 +1361,7 @@ static const TParserStateActionItem actionTPS_Base[] = {
 
 static const TParserStateActionItem actionTPS_InNumWord[] = {
 	{p_isEOF, 0, A_BINGO, TPS_Base, NUMWORD, NULL},
-    {p_isCJK, 0, A_BINGO, TPS_Base, NUMWORD, NULL},
+	{p_isCJK, 0, A_BINGO, TPS_Base, NUMWORD, NULL},
 	{p_isalnum, 0, A_NEXT, TPS_InNumWord, 0, NULL},
 	{p_isspecial, 0, A_NEXT, TPS_InNumWord, 0, NULL},
 	{p_iseqC, '@', A_PUSH, TPS_InEmail, 0, NULL},
@@ -1374,7 +1373,7 @@ static const TParserStateActionItem actionTPS_InNumWord[] = {
 
 static const TParserStateActionItem actionTPS_InAsciiWord[] = {
 	{p_isEOF, 0, A_BINGO, TPS_Base, ASCIIWORD, NULL},
-    {p_isCJK, 0, A_BINGO, TPS_Base, ASCIIWORD, NULL},
+	{p_isCJK, 0, A_BINGO, TPS_Base, ASCIIWORD, NULL},
 	{p_iseqC, '.', A_PUSH, TPS_InHostFirstDomain, 0, NULL},
 	{p_iseqC, '.', A_PUSH, TPS_InFileNext, 0, NULL},
 	{p_iseqC, '-', A_PUSH, TPS_InHostFirstAN, 0, NULL},
@@ -1384,8 +1383,8 @@ static const TParserStateActionItem actionTPS_InAsciiWord[] = {
 	{p_iseqC, ':', A_PUSH, TPS_InProtocolFirst, 0, NULL},
 	{p_iseqC, '/', A_PUSH, TPS_InFileFirst, 0, NULL},
 	{p_isdigit, 0, A_PUSH, TPS_InHost, 0, NULL},
-    {p_isdigit, 0, A_NEXT, TPS_InNumWord, 0, NULL},
-    {p_isasclet, 0, A_NEXT, TPS_Null, 0, NULL},
+	{p_isdigit, 0, A_NEXT, TPS_InNumWord, 0, NULL},
+	{p_isasclet, 0, A_NEXT, TPS_Null, 0, NULL},
 	{p_isalpha, 0, A_NEXT, TPS_InWord, 0, NULL},
 	{p_isspecial, 0, A_NEXT, TPS_InWord, 0, NULL},
 	{NULL, 0, A_BINGO, TPS_Base, ASCIIWORD, NULL}
@@ -1393,7 +1392,7 @@ static const TParserStateActionItem actionTPS_InAsciiWord[] = {
 
 static const TParserStateActionItem actionTPS_InWord[] = {
 	{p_isEOF, 0, A_BINGO, TPS_Base, WORD_T, NULL},
-    {p_isCJK, 0, A_BINGO, TPS_Base, WORD_T, NULL},
+	{p_isCJK, 0, A_BINGO, TPS_Base, WORD_T, NULL},
 	{p_isalpha, 0, A_NEXT, TPS_Null, 0, NULL},
 	{p_isspecial, 0, A_NEXT, TPS_Null, 0, NULL},
 	{p_isdigit, 0, A_NEXT, TPS_InNumWord, 0, NULL},
@@ -1403,7 +1402,7 @@ static const TParserStateActionItem actionTPS_InWord[] = {
 
 static const TParserStateActionItem actionTPS_InUnsignedInt[] = {
 	{p_isEOF, 0, A_BINGO, TPS_Base, UNSIGNEDINT, NULL},
-    {p_isCJK, 0, A_BINGO, TPS_Base, UNSIGNEDINT, NULL},
+	{p_isCJK, 0, A_BINGO, TPS_Base, UNSIGNEDINT, NULL},
 	{p_isdigit, 0, A_NEXT, TPS_Null, 0, NULL},
 	{p_iseqC, '.', A_PUSH, TPS_InHostFirstDomain, 0, NULL},
 	{p_iseqC, '.', A_PUSH, TPS_InUDecimalFirst, 0, NULL},
@@ -1436,7 +1435,7 @@ static const TParserStateActionItem actionTPS_InSignedInt[] = {
 
 static const TParserStateActionItem actionTPS_InSpace[] = {
 	{p_isEOF, 0, A_BINGO, TPS_Base, SPACE, NULL},
-    {p_isCJK, 0, A_BINGO, TPS_Base, SPACE, NULL},
+	{p_isCJK, 0, A_BINGO, TPS_Base, SPACE, NULL},
 	{p_iseqC, '<', A_BINGO, TPS_Base, SPACE, NULL},
 	{p_isignore, 0, A_NEXT, TPS_Null, 0, NULL},
 	{p_iseqC, '-', A_BINGO, TPS_Base, SPACE, NULL},
@@ -2088,7 +2087,7 @@ static const TParserStateAction Actions[] = {
 	TPARSERSTATEACTION(TPS_InHyphenAsciiWordPart),
 	TPARSERSTATEACTION(TPS_InHyphenNumWordPart),
 	TPARSERSTATEACTION(TPS_InHyphenUnsignedInt),
-    TPARSERSTATEACTION(TPS_InCJK),
+	TPARSERSTATEACTION(TPS_InCJK),
 };
 
 
@@ -2294,12 +2293,12 @@ prsd2_nexttoken(PG_FUNCTION_ARGS)
 
 	*t = p->token;
 	*tlen = p->lenbytetoken;
-    if (p->type == CJK_CHAR){
-        if (p_isCJK2gram_twice(p)){
-            //can current CJK char and the next char form a 2-gram token?
+	if (p->type == CJK_CHAR){
+		if (p_isCJK2gram_twice(p)){
+			//can current CJK char and the next char form a 2-gram token?
 			//we want to make sure CJK tokens are 2-gram if possible
-            *tlen += pg_mblen(p->str + p->state->posbyte);
-        }
+			*tlen += pg_mblen(p->str + p->state->posbyte);
+		}
 		else if (!p_isCJKunigram(p)){
 			//not CJK 2-gram and it is not unigram CJK itself
 			//treat this as a space
@@ -2309,8 +2308,7 @@ prsd2_nexttoken(PG_FUNCTION_ARGS)
 			p->type = SPACE;
 			*tlen = 0;
 		}
-    }
-    
+	}
 
 	PG_RETURN_INT32(p->type);
 }
@@ -2963,7 +2961,7 @@ Datum
 prsd2_zht2zhs(PG_FUNCTION_ARGS)
 {
 	text * zhs_text = PG_GETARG_TEXT_P_COPY(0);
-    int32 size = VARSIZE_ANY_EXHDR(zhs_text);
+	int32 size = VARSIZE_ANY_EXHDR(zhs_text);
 	
 	int pos = 0;
 	char * cur = VARDATA(zhs_text);
@@ -2971,12 +2969,12 @@ prsd2_zht2zhs(PG_FUNCTION_ARGS)
 	while(pos < size){
 		unsigned int cjk = utf8_cjkCodePoint(cur + pos);
 #ifdef WPARSER_TRACE
-        fprintf(stderr, "current char [%x] pos[%d]\n", cjk, pos); 
+		fprintf(stderr, "current char [%x] pos[%d]\n", cjk, pos); 
 #endif
 		if(cjk >= 0x346F && cjk <= 0x9FD3){
 			cjk = zht2zhs[cjk - 0x346F];
 #ifdef WPARSER_TRACE
-        	fprintf(stderr, "its zhs is %x\n", cjk); 
+			fprintf(stderr, "its zhs is %x\n", cjk); 
 #endif
 			utf8_setCjkCodePoint(cur + pos, cjk);
 			pos += 3;
@@ -3007,5 +3005,5 @@ prsd2_zht2zhs(PG_FUNCTION_ARGS)
 		}
 	}
 
-    PG_RETURN_TEXT_P(zhs_text);
+	PG_RETURN_TEXT_P(zhs_text);
 }
