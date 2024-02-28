@@ -108,6 +108,7 @@ Copy the following files
 > pg_cjk_parser.c
 > pg_cjk_parser.control
 > pg_cjk_parser--0.0.1.sql
+> zht2zhs.h
 > Makefile
 
 to a directory on the server, say, /home/user/parser/
