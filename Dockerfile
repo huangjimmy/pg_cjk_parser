@@ -1,5 +1,5 @@
 ARG POSTGRES_VERSION=16
-FROM postgres:$POSTGRES_VERSION as build
+FROM postgres:$POSTGRES_VERSION AS build
 ARG POSTGRES_VERSION=16
 RUN apt-get update && apt-get install -y --no-install-recommends postgresql-server-dev-$POSTGRES_VERSION gcc make icu-devtools libicu-dev
 

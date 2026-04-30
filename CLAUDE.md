@@ -17,3 +17,4 @@
 - Add tests that actually run and reveal the bug — do not just infer correctness from reading code.
 - Run the tests against the buggy code first to confirm they fail, then fix the bug and confirm they pass.
 - Correctness before anything else (style, refactoring, etc.).
+- The pre-commit hook also runs a compiler-warning lint pass (PG16 build). Zero warnings required.

@@ -1,5 +1,5 @@
 
-FROM postgres:11-alpine3.13 as build
+FROM postgres:11-alpine3.13 AS build
 RUN apk update && apk add build-base postgresql postgresql-dev gcc make clang
 
 RUN mkdir -p /root/parser

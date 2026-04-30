@@ -11,7 +11,17 @@ if ! echo "$STAGED" | grep -qE '\.(c|h|sql|control)$|^Makefile$|^postgres-'; the
     exit 0
 fi
 
-echo "pre-commit: building images and running tests for PG11, PG12, PG16, PG18..."
+echo "pre-commit: linting and building images and running tests for PG11, PG12, PG16, PG18..."
+
+# --- Lint: fail on any compiler warning or error ---
+echo "--- lint: C warnings (PG16) ---"
+BUILD_LOG=$(docker build --build-arg POSTGRES_VERSION=16 -f Dockerfile_alpine -t postgres:16-dev . 2>&1)
+WARNINGS=$(echo "$BUILD_LOG" | grep -E 'pg_cjk_parser\.(c|h):[0-9]+:[0-9]+: (warning|error):' || true)
+if [ -n "$WARNINGS" ]; then
+    echo "$WARNINGS"
+    echo "ERROR: compiler warnings/errors — fix before committing"
+    exit 1
+fi
 
 build() {
     local label=$1; shift

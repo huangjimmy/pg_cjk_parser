@@ -100,6 +100,17 @@ then
     exit 1
 fi
 
+# Test utf8_setCjkCodePoint is not a silent no-op:
+# if it silently did nothing, Traditional Chinese input would be returned unchanged
+OUTPUT=$(docker exec postgres16 psql -U postgres -c "SELECT cjk_zht2zhs('漢') != '漢';")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"t"* ]];
+then
+    echo "cjk_zht2zhs: utf8_setCjkCodePoint appears to be a silent no-op"
+    docker stop postgres16 && docker rm postgres16
+    exit 1
+fi
+
 # Bug 001 + 002: 4-byte CJK Ext-B characters interspersed with Traditional Chinese.
 # Bug 001 (missing return in utf8_cjkCodePoint) causes 𠁐 to return 0 and fall to else.
 # Bug 002 then reads *cur (0xE6, 3-byte lead of 汉) instead of *(cur+pos) (0xF0, 4-byte

@@ -1,0 +1,10 @@
+-- pg_cjk_parser upgrade script: 0.0.1 -> 0.1.0
+--
+-- No SQL-level objects changed in this release.
+-- Fixes are in the C extension:
+--   - cjk_zht2zhs: wrong pointer (*cur vs *(cur+pos)) caused silent
+--     conversion misses for mixed-encoding strings (Bug 002)
+--   - utf8_cjkCodePoint: missing return for 4-byte sequences (Bug 001)
+--   - lc_ctype_is_c removed in PG18; use database_ctype_is_c on PG15+
+--   - pg_mblen replaced with pg_mblen_range for buffer safety on PG14+
+--   - hlCover: new O(n) algorithm using TS_execute_locations on PG16+

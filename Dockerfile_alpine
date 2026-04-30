@@ -1,6 +1,6 @@
 
 ARG POSTGRES_VERSION=16
-FROM postgres:$POSTGRES_VERSION-alpine as build
+FROM postgres:$POSTGRES_VERSION-alpine AS build
 ARG POSTGRES_VERSION=16
 RUN apk update && apk add musl-dev icu-dev make && \
     LLVM_VER=$(pg_config --configure | grep -oE "llvm[0-9]+" | head -1 | grep -oE "[0-9]+") && \
