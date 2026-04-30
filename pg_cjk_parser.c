@@ -789,7 +789,7 @@ p_isCJK2gram_twice(TParser *prs)
 
 	if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide)
 	{
-		if (prs->state->posbyte > prs->lenstr)
+		if (prs->state->posbyte >= prs->lenstr)
 			return 0;
 
 		/* p_isCJKchar only works in UTF8 encoding */
@@ -3463,7 +3463,12 @@ prsd2_zht2zhs(PG_FUNCTION_ARGS)
 #ifdef WPARSER_TRACE
 			fprintf(stderr, "its zhs is %x\n", cjk);
 #endif
-			utf8_setCjkCodePoint(cur + pos, cjk);
+			/*
+			 * 0 means no simplified form exists — leave the original bytes
+			 * untouched.  Only write when there is an actual mapping.
+			 */
+			if (cjk != 0)
+				utf8_setCjkCodePoint(cur + pos, cjk);
 			pos += 3;
 		}
 		else

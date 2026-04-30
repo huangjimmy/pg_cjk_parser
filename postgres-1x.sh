@@ -147,4 +147,17 @@ then
     exit 1
 fi
 
+
+# Test characters with no simplified form are returned unchanged (not errored)
+# 一(U+4E00) has no simplified equivalent — zht2zhs maps it to 0.
+# Before the fix, calling utf8_setCjkCodePoint with 0 triggered elog(ERROR).
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SELECT cjk_zht2zhs('一') = '一';")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"t"* ]];
+then
+    echo "cjk_zht2zhs: character with no simplified form should be returned unchanged"
+    docker stop postgres_db && docker rm postgres_db
+    exit 1
+fi
+
 docker stop postgres_db && docker rm postgres_db
