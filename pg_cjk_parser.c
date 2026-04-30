@@ -16,7 +16,9 @@
 
 #include <limits.h>
 
+#if PG_VERSION_NUM < 150000
 #include "catalog/pg_collation.h"
+#endif
 #include "commands/defrem.h"
 #include "tsearch/ts_locale.h"
 #include "tsearch/ts_public.h"
@@ -316,11 +318,14 @@ TParserInit(char *str, int len)
 	 */
 	if (prs->charmaxlen > 1)
 	{
-		Oid			collation = DEFAULT_COLLATION_OID;	/* TODO */
 		pg_locale_t mylocale = 0;	/* TODO */
 
 		prs->usewide = true;
-		if (lc_ctype_is_c(collation))
+#if PG_VERSION_NUM >= 150000
+		if (database_ctype_is_c)
+#else
+		if (lc_ctype_is_c(DEFAULT_COLLATION_OID))
+#endif
 		{
 			/*
 			 * char2wchar doesn't work for C-locale and sizeof(pg_wchar) could
