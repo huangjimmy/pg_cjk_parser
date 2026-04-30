@@ -100,6 +100,17 @@ then
     exit 1
 fi
 
+# Test utf8_setCjkCodePoint is not a silent no-op:
+# if it silently did nothing, Traditional Chinese input would be returned unchanged
+OUTPUT=$(docker exec postgres11 psql -U postgres -c "SELECT cjk_zht2zhs('漢') != '漢';")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"t"* ]];
+then
+    echo "cjk_zht2zhs: utf8_setCjkCodePoint appears to be a silent no-op"
+    docker stop postgres11 && docker rm postgres11
+    exit 1
+fi
+
 # Bug 001 + 002: 4-byte CJK Ext-B characters interspersed with Traditional Chinese.
 # Bug 001 (missing return in utf8_cjkCodePoint) causes 𠁐 to return 0 and fall to else.
 # Bug 002 then reads *cur (0xE6, 3-byte lead of 汉) instead of *(cur+pos) (0xF0, 4-byte
@@ -110,6 +121,28 @@ echo $OUTPUT
 if [[ "$OUTPUT" != *"𠀀汉𠁐汉"* ]];
 then
     echo "cjk_zht2zhs Bug 001+002: conversion missed after 4-byte CJK character (see issues/2026-04-30-bug-001-utf8_cjkCodePoint-missing-return.md)"
+    docker stop postgres11 && docker rm postgres11
+    exit 1
+fi
+
+
+# Test utf8_setCjkCodePoint is not a silent no-op:
+# if it silently did nothing, Traditional Chinese input would be returned unchanged
+OUTPUT=$(docker exec postgres11 psql -U postgres -c "SELECT cjk_zht2zhs('漢') != '漢';")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"t"* ]];
+then
+    echo "cjk_zht2zhs: utf8_setCjkCodePoint appears to be a silent no-op"
+    docker stop postgres11 && docker rm postgres11
+    exit 1
+fi
+
+# Test upgrade path: ALTER EXTENSION UPDATE must succeed (requires upgrade SQL script in image)
+OUTPUT=$(docker exec postgres11 psql -U postgres -c "ALTER EXTENSION pg_cjk_parser UPDATE TO '0.1.0';")
+echo $OUTPUT
+if [[ "$OUTPUT" != "ALTER EXTENSION" ]];
+then
+    echo "ALTER EXTENSION pg_cjk_parser UPDATE failed — upgrade SQL script missing from image"
     docker stop postgres11 && docker rm postgres11
     exit 1
 fi

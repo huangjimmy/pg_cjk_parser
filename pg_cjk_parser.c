@@ -330,7 +330,7 @@ TParserInit(char *str, int len)
 	 */
 	if (prs->charmaxlen > 1)
 	{
-		pg_locale_t mylocale = 0;	/* TODO */
+		pg_locale_t mylocale = 0;	/* NULL = use database default locale */
 
 		prs->usewide = true;
 #if PG_VERSION_NUM >= 150000
@@ -769,6 +769,9 @@ utf8_setCjkCodePoint(char *s, unsigned int codePoint)
 			return;
 		}
 	}
+
+	elog(ERROR, "pg_cjk_parser: codepoint 0x%x is not in any known CJK range",
+		 codePoint);
 }
 
 static int
