@@ -11,7 +11,7 @@ if ! echo "$STAGED" | grep -qE '\.(c|h|sql|control)$|^Makefile$|^postgres-'; the
     exit 0
 fi
 
-echo "pre-commit: building images and running tests for PG11, PG12, PG16..."
+echo "pre-commit: building images and running tests for PG11, PG12, PG16, PG18..."
 
 build() {
     local label=$1; shift
@@ -38,5 +38,8 @@ run_tests "PostgreSQL 12" postgres-12.sh
 
 build "PG16" --build-arg POSTGRES_VERSION=16 -f Dockerfile_alpine -t postgres:16-dev .
 run_tests "PostgreSQL 16" postgres-16.sh
+
+build "PG18" --build-arg POSTGRES_VERSION=18 -f Dockerfile_alpine -t postgres:dev .
+run_tests "PostgreSQL 18" postgres-1x.sh
 
 echo "pre-commit: all tests passed"
