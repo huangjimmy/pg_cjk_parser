@@ -2,7 +2,9 @@
 ARG POSTGRES_VERSION=16
 FROM postgres:$POSTGRES_VERSION-alpine as build
 ARG POSTGRES_VERSION=16
-RUN apk update && apk add musl-dev icu-dev llvm15-dev clang15 make
+RUN apk update && apk add musl-dev icu-dev make && \
+    LLVM_VER=$(pg_config --configure | grep -oE "llvm[0-9]+" | head -1 | grep -oE "[0-9]+") && \
+    apk add clang${LLVM_VER} llvm${LLVM_VER}-dev
 
 RUN mkdir -p /root/parser
 WORKDIR /root/parser
