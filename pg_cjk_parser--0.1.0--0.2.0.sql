@@ -1,0 +1,5 @@
+-- pg_cjk_parser upgrade: 0.1.0 -> 0.2.0
+-- Adds emoji token type (alias: "emoji") to the parser.
+-- To index emoji in your text search configuration:
+--   ALTER TEXT SEARCH CONFIGURATION <your_config>
+--     ADD MAPPING FOR emoji WITH simple;

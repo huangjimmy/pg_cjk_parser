@@ -84,8 +84,9 @@ PG_FUNCTION_INFO_V1(prsd2_lextype);
 #define UNSIGNEDINT		22
 #define XMLENTITY		23
 #define CJK_CHAR		24
+#define EMOJI_T			25
 
-#define LASTNUM			24
+#define LASTNUM			25
 
 static const char *const tok_alias[] = {
 	"",
@@ -112,7 +113,8 @@ static const char *const tok_alias[] = {
 	"int",
 	"uint",
 	"entity",
-	"cjk"
+	"cjk",
+	"emoji"
 };
 
 static const char *const lex_descr[] = {
@@ -140,7 +142,8 @@ static const char *const lex_descr[] = {
 	"Signed integer",
 	"Unsigned integer",
 	"XML entity",
-	"CJK Char"
+	"CJK Char",
+	"Emoji symbol"
 };
 
 
@@ -226,6 +229,7 @@ typedef enum
 	TPS_InHyphenNumWordPart,
 	TPS_InHyphenUnsignedInt,
 	TPS_InCJK,
+	TPS_InEmoji,
 	TPS_Null					/* last state (fake value) */
 } TParserState;
 
@@ -962,6 +966,32 @@ p_isCJKunigram(TParser *prs)
 	return 0;
 }
 
+static int
+p_isEmoji(TParser *prs)
+{
+	if (GetDatabaseEncoding() == PG_UTF8 && prs->usewide)
+	{
+		pg_wchar	c;
+
+		if (prs->pgwstr)
+			c = *(prs->pgwstr + prs->state->poschar);
+		else
+			c = (pg_wchar) *(prs->wstr + prs->state->poschar);
+
+		/* Miscellaneous Symbols and Dingbats (3-byte UTF-8) */
+		if (c >= 0x2600 && c <= 0x27BF)
+			return 1;
+
+		/*
+		 * Emoji proper: Misc Symbols & Pictographs, Emoticons, Transport,
+		 * Supplemental Symbols, and related blocks (4-byte UTF-8).
+		 */
+		if (c >= 0x1F300 && c <= 0x1FAFF)
+			return 1;
+	}
+	return 0;
+}
+
 /* deliberately suppress unused-function complaints for the above */
 void		_make_compiler_happy(void);
 void
@@ -994,6 +1024,7 @@ _make_compiler_happy(void)
 	p_isCJKunigram(NULL);
 	p_isCJK(NULL);
 	p_isnotCJK(NULL);
+	p_isEmoji(NULL);
 }
 
 
@@ -1393,9 +1424,15 @@ p_isspecial(TParser *prs)
  * Table of state/action of parser
  */
 
+static const TParserStateActionItem actionTPS_InEmoji[] = {
+	{p_isEOF, 0, A_BINGO, TPS_Base, EMOJI_T, NULL},
+	{NULL, 0, A_BINGO, TPS_Base, EMOJI_T, NULL}
+};
+
 static const TParserStateActionItem actionTPS_Base[] = {
 	{p_isEOF, 0, A_NEXT, TPS_Null, 0, NULL},
-	{p_isCJK, 0, A_NEXT, TPS_InCJK, 0, NULL}, 
+	{p_isCJK, 0, A_NEXT, TPS_InCJK, 0, NULL},
+	{p_isEmoji, 0, A_NEXT, TPS_InEmoji, 0, NULL},
 	{p_iseqC, '<', A_PUSH, TPS_InTagFirst, 0, NULL},
 	{p_isignore, 0, A_NEXT, TPS_InSpace, 0, NULL},
 	{p_isasclet, 0, A_NEXT, TPS_InAsciiWord, 0, NULL},
@@ -2140,6 +2177,7 @@ static const TParserStateAction Actions[] = {
 	TPARSERSTATEACTION(TPS_InHyphenNumWordPart),
 	TPARSERSTATEACTION(TPS_InHyphenUnsignedInt),
 	TPARSERSTATEACTION(TPS_InCJK),
+	TPARSERSTATEACTION(TPS_InEmoji),
 };
 
 

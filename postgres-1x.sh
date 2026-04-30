@@ -56,6 +56,7 @@ docker exec postgres_db psql -U postgres -c "ALTER TEXT SEARCH CONFIGURATION pub
 docker exec postgres_db psql -U postgres -c "ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk ADD MAPPING FOR version WITH simple;"
 
 docker exec postgres_db psql -U postgres -c "ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk ADD MAPPING FOR word WITH simple;"
+docker exec postgres_db psql -U postgres -c "ALTER TEXT SEARCH CONFIGURATION public.config_2_gram_cjk ADD MAPPING FOR emoji WITH simple;"
 
 OUTPUT=$(docker exec postgres_db psql -U postgres -c "SET default_text_search_config = 'public.config_2_gram_cjk'; SELECT to_tsvector('Doraemnon Nobita「ドラえもん のび太の牧場物語」多拉A梦 野比大雄χΨψΩω'), to_tsquery('のび太'), to_tsquery('野比大雄');")
 echo $OUTPUT
@@ -138,7 +139,7 @@ then
 fi
 
 # Test upgrade path: ALTER EXTENSION UPDATE must succeed (requires upgrade SQL script in image)
-OUTPUT=$(docker exec postgres_db psql -U postgres -c "ALTER EXTENSION pg_cjk_parser UPDATE TO '0.1.0';")
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "ALTER EXTENSION pg_cjk_parser UPDATE TO '0.2.0';")
 echo $OUTPUT
 if [[ "$OUTPUT" != "ALTER EXTENSION" ]];
 then
@@ -158,6 +159,130 @@ then
     echo "cjk_zht2zhs: character with no simplified form should be returned unchanged"
     docker stop postgres_db && docker rm postgres_db
     exit 1
+fi
+
+
+# --- Mixed language and emoji tests ---
+
+# French (2-byte UTF-8) before Traditional Chinese
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SELECT cjk_zht2zhs('café漢語');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"café汉语"* ]]; then
+    echo "cjk_zht2zhs: French chars before CJK failed"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# Traditional Chinese around French
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SELECT cjk_zht2zhs('漢語café漢');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"汉语café汉"* ]]; then
+    echo "cjk_zht2zhs: French chars between CJK failed"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# Emoji (4-byte) before Traditional Chinese
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SELECT cjk_zht2zhs('😀漢語');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"😀汉语"* ]]; then
+    echo "cjk_zht2zhs: emoji before CJK failed"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# Traditional Chinese around emoji
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SELECT cjk_zht2zhs('漢😀語');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"汉😀语"* ]]; then
+    echo "cjk_zht2zhs: emoji between CJK failed"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# Pure ASCII must be returned unchanged
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SELECT cjk_zht2zhs('hello world') = 'hello world';")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"t"* ]]; then
+    echo "cjk_zht2zhs: pure ASCII not returned unchanged"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# Empty string must not crash
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SELECT cjk_zht2zhs('') = '';")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"t"* ]]; then
+    echo "cjk_zht2zhs: empty string failed"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# Single CJK character must emit as unigram (not dropped)
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SET default_text_search_config='public.config_2_gram_cjk'; SELECT to_tsvector('你');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"'你'"* ]]; then
+    echo "tokenizer: single CJK character not emitted as unigram"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# Two CJK characters must produce exactly one 2-gram
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SET default_text_search_config='public.config_2_gram_cjk'; SELECT to_tsvector('你好');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"'你好'"* ]]; then
+    echo "tokenizer: two CJK chars did not produce 2-gram"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# English + Chinese: ASCII words and CJK 2-grams coexist
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SET default_text_search_config='public.config_2_gram_cjk'; SELECT to_tsvector('hello 你好世界');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"'你好'"* ]] || [[ "$OUTPUT" != *"'好世'"* ]] || [[ "$OUTPUT" != *"'世界'"* ]]; then
+    echo "tokenizer: English + Chinese mixed tokenization failed"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# French + Japanese: non-ASCII Latin and CJK coexist
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SET default_text_search_config='public.config_2_gram_cjk'; SELECT to_tsvector('café 東京 bonjour');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"'東京'"* ]] || [[ "$OUTPUT" != *"'café'"* ]]; then
+    echo "tokenizer: French + Japanese mixed tokenization failed"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# CJK + emoji + CJK: emoji tokenized, CJK 2-grams unaffected
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SET default_text_search_config='public.config_2_gram_cjk'; SELECT to_tsvector('你好😀世界');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"'你好'"* ]] || [[ "$OUTPUT" != *"'世界'"* ]]; then
+    echo "tokenizer: CJK + emoji + CJK tokenization failed"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# CJK adjacent to ASCII with no spaces
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SET default_text_search_config='public.config_2_gram_cjk'; SELECT to_tsvector('abc你好def');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"'abc'"* ]] || [[ "$OUTPUT" != *"'你好'"* ]] || [[ "$OUTPUT" != *"'def'"* ]]; then
+    echo "tokenizer: CJK adjacent to ASCII (no spaces) failed"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+
+# Emoji is tokenized as its own 'emoji' token type (always unigram, never n-gram)
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SET default_text_search_config='public.config_2_gram_cjk'; SELECT to_tsvector('😀');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"'😀'"* ]]; then
+    echo "tokenizer: emoji not indexed as emoji token type"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# Emoji between CJK chars: CJK 2-grams and emoji are all indexed
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SET default_text_search_config='public.config_2_gram_cjk'; SELECT to_tsvector('你好😀世界');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"'你好'"* ]] || [[ "$OUTPUT" != *"'😀'"* ]] || [[ "$OUTPUT" != *"'世界'"* ]]; then
+    echo "tokenizer: CJK + emoji + CJK tokenization failed"
+    docker stop postgres_db && docker rm postgres_db; exit 1
+fi
+
+# Multiple emoji: each is a separate token
+OUTPUT=$(docker exec postgres_db psql -U postgres -c "SET default_text_search_config='public.config_2_gram_cjk'; SELECT to_tsvector('😀🔥');")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"'😀'"* ]] || [[ "$OUTPUT" != *"'🔥'"* ]]; then
+    echo "tokenizer: consecutive emoji not tokenized as separate tokens"
+    docker stop postgres_db && docker rm postgres_db; exit 1
 fi
 
 docker stop postgres_db && docker rm postgres_db
