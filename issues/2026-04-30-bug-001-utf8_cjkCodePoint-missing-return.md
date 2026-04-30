@@ -1,7 +1,9 @@
 # Bug 001 — `utf8_cjkCodePoint`: missing `return` for 4-byte UTF-8 sequences
 
+**Status: FIXED** — merged in commit `b62aa51` (PR #13), 2026-04-30
+
 **File:** `pg_cjk_parser.c`  
-**Function:** `utf8_cjkCodePoint` (~line 705)  
+**Function:** `utf8_cjkCodePoint`  
 **Severity:** Medium (code logic is wrong; current practical impact is masked by Bug 002)
 
 ---
@@ -80,4 +82,4 @@ if(((c ^ 0xF0) & 0xF8) == 0){
 SELECT prsd2_zht2zhs('𠀀漢𠁐漢');
 ```
 
-Added to CI scripts as a failing test (will pass once both bugs are fixed).
+Regression test added to all CI scripts (`postgres-11/12/16/1x.sh`). Confirmed failing before fix and passing after.

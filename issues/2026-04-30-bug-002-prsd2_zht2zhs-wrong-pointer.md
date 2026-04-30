@@ -1,7 +1,9 @@
 # Bug 002 — `prsd2_zht2zhs`: wrong pointer in `else` branch skips conversions
 
+**Status: FIXED** — merged in commit `b62aa51` (PR #13), 2026-04-30
+
 **File:** `pg_cjk_parser.c`  
-**Function:** `prsd2_zht2zhs` (~line 2982)  
+**Function:** `prsd2_zht2zhs`  
 **Severity:** High — causes `prsd2_zht2zhs` to silently miss Traditional→Simplified conversions
 
 ---
@@ -103,7 +105,7 @@ and would otherwise stall `pos` forever).
 ## Tests that reveal this bug
 
 Added to all CI test scripts (`postgres-11.sh`, `postgres-12.sh`, `postgres-16.sh`,
-`postgres-1x.sh`).  Both tests fail with the current code and pass after the fix.
+`postgres-1x.sh`). Both tests confirmed failing before fix and passing after.
 
 ```sql
 -- Bug 002 alone: 2-byte Latin char before ASCII before Traditional Chinese
