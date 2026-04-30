@@ -706,6 +706,7 @@ utf8_cjkCodePoint(char * s){
 		a = ((s[0] & 0x7)<<6) | ((s[1]) & 0x3F);
 		b = ((s[2] & 0x3F)<<6) | (s[3] & 0x3F);
 		c = ((a<<12) | b);
+		return c;
 	}
 
 	return 0;
@@ -2980,7 +2981,7 @@ prsd2_zht2zhs(PG_FUNCTION_ARGS)
 			pos += 3;
 		}
 		else{
-			unsigned char c = *cur;
+			unsigned char c = *(cur + pos);
 			if(c < 128)pos++;
 			else if(((c ^ 0xC0) & 0xE0) == 0){
 				//110
@@ -3001,6 +3002,9 @@ prsd2_zht2zhs(PG_FUNCTION_ARGS)
 			else if(((c ^ 0xFC) & 0xFE) == 0){
 				///1111, 110
 				pos += 6;
+			}
+			else{
+				pos++;
 			}
 		}
 	}

@@ -1,0 +1,42 @@
+#!/bin/bash
+set -e
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# Skip if no source, SQL, or test-script files are staged
+STAGED=$(git diff --cached --name-only)
+if ! echo "$STAGED" | grep -qE '\.(c|h|sql|control)$|^Makefile$|^postgres-'; then
+    echo "pre-commit: no source or test changes — skipping build tests"
+    exit 0
+fi
+
+echo "pre-commit: building images and running tests for PG11, PG12, PG16..."
+
+build() {
+    local label=$1; shift
+    if ! docker build "$@" > /dev/null 2>&1; then
+        echo "ERROR: $label image build failed"
+        exit 1
+    fi
+}
+
+run_tests() {
+    local label=$1; local script=$2
+    echo "--- $label ---"
+    if ! bash "$script"; then
+        echo "ERROR: $label tests failed"
+        exit 1
+    fi
+}
+
+build "PG11" -f Dockerfile_pg11 -t postgres:11-dev .
+run_tests "PostgreSQL 11" postgres-11.sh
+
+build "PG12" --build-arg POSTGRES_VERSION=12 -f Dockerfile_alpine -t postgres:12-dev .
+run_tests "PostgreSQL 12" postgres-12.sh
+
+build "PG16" --build-arg POSTGRES_VERSION=16 -f Dockerfile_alpine -t postgres:16-dev .
+run_tests "PostgreSQL 16" postgres-16.sh
+
+echo "pre-commit: all tests passed"
