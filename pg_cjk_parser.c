@@ -28,6 +28,18 @@
 
 #include "zht2zhs.h"
 
+/*
+ * pg_mblen_range(mbstr, end) was introduced in PG14. It is like pg_mblen()
+ * but clamps the returned length to (end - mbstr), preventing a read past
+ * the end of the buffer when a multibyte sequence is truncated or corrupt.
+ * For PG11-13 we emulate it: all valid input is already within a correctly
+ * sized palloc'd buffer, so the Min() clamp is a no-op in practice.
+ */
+#if PG_VERSION_NUM < 140000
+#define pg_mblen_range(mbstr, end) \
+	Min(pg_mblen(mbstr), (int)((end) - (const char *)(mbstr)))
+#endif
+
 
 Datum prsd2_start(PG_FUNCTION_ARGS);
 Datum prsd2_nexttoken(PG_FUNCTION_ARGS);
@@ -2148,7 +2160,8 @@ TParserGet(TParser *prs)
 			prs->state->charlen = 0;
 		else
 			prs->state->charlen = (prs->charmaxlen == 1) ? prs->charmaxlen :
-				pg_mblen(prs->str + prs->state->posbyte);
+				pg_mblen_range(prs->str + prs->state->posbyte,
+							   prs->str + prs->lenstr);
 
 		Assert(prs->state->posbyte + prs->state->charlen <= prs->lenstr);
 		Assert(prs->state->state >= TPS_Base && prs->state->state < TPS_Null);
@@ -2338,7 +2351,8 @@ prsd2_nexttoken(PG_FUNCTION_ARGS)
 			 * Current char and next char can form a 2-gram token; extend
 			 * tlen to cover both characters.
 			 */
-			*tlen += pg_mblen(p->str + p->state->posbyte);
+			*tlen += pg_mblen_range(p->str + p->state->posbyte,
+									p->str + p->lenstr);
 		}
 		else if (!p_isCJKunigram(p))
 		{
@@ -2437,6 +2451,7 @@ checkcondition_HL(void *opaque, QueryOperand *val, ExecPhraseData *data)
 }
 
 
+#if PG_VERSION_NUM < 160000
 static bool
 hlCover(HeadlineParsedText *prs, TSQuery query, int *p, int *q)
 {
@@ -2507,6 +2522,122 @@ hlCover(HeadlineParsedText *prs, TSQuery query, int *p, int *q)
 
 	return false;
 }
+#else							/* PG_VERSION_NUM >= 160000 */
+/*
+ * hlCover: try to find a minimal word-range in prs->words[] that satisfies
+ * the query, starting the search at or after *nextpos.  On success, sets
+ * *nextpos = posb+1 (for the next iteration), *p = first word index,
+ * *q = last word index, and returns true.
+ *
+ * Verbatim from upstream wparser_def.c (PG16+).
+ */
+static bool
+hlCover(HeadlineParsedText *prs, TSQuery query, List *locations,
+		int *nextpos, int *p, int *q)
+{
+	int			pos = *nextpos;
+
+	/* This loop repeats when our selected word-range fails the query */
+	for (;;)
+	{
+		int			posb,
+					pose;
+		ListCell   *lc;
+
+		/*
+		 * For each AND'ed query term or phrase, find its first occurrence at
+		 * or after pos; set pose to the maximum of those positions.
+		 */
+		pose = -1;
+		foreach(lc, locations)
+		{
+			ExecPhraseData *pdata = (ExecPhraseData *) lfirst(lc);
+			int			first = -1;
+
+			for (int i = 0; i < pdata->npos; i++)
+			{
+				int			endp = pdata->pos[i];
+
+				if (endp >= pos)
+				{
+					first = endp;
+					break;
+				}
+			}
+			if (first < 0)
+				return false;
+			if (first > pose)
+				pose = first;
+		}
+
+		if (pose < 0)
+			return false;
+
+		/*
+		 * For each AND'ed term, find its last occurrence at or before pose;
+		 * set posb to the minimum of those starting positions.
+		 */
+		posb = INT_MAX - 1;
+		foreach(lc, locations)
+		{
+			ExecPhraseData *pdata = (ExecPhraseData *) lfirst(lc);
+			int			last = -1;
+
+			for (int i = pdata->npos - 1; i >= 0; i--)
+			{
+				int			startp = pdata->pos[i] - pdata->width;
+
+				if (startp <= pose)
+				{
+					last = startp;
+					break;
+				}
+			}
+			if (last < posb)
+				posb = last;
+		}
+
+		posb = Max(posb, pos);
+
+		if (posb <= pose)
+		{
+			int			idxb = -1;
+			int			idxe = -1;
+
+			for (int i = 0; i < prs->curwords; i++)
+			{
+				if (prs->words[i].item == NULL)
+					continue;
+				if (idxb < 0 && prs->words[i].pos >= posb)
+					idxb = i;
+				if (prs->words[i].pos <= pose)
+					idxe = i;
+				else
+					break;
+			}
+
+			if (idxb >= 0 && idxe >= idxb)
+			{
+				hlCheck		ch;
+
+				ch.words = &(prs->words[idxb]);
+				ch.len = idxe - idxb + 1;
+				if (TS_execute(GETQUERY(query), &ch,
+							   TS_EXEC_EMPTY, checkcondition_HL))
+				{
+					*nextpos = posb + 1;
+					*p = idxb;
+					*q = idxe;
+					return true;
+				}
+			}
+		}
+
+		pos = posb + 1;
+	}
+	return false;
+}
+#endif							/* PG_VERSION_NUM >= 160000 */
 
 static void
 mark_fragment(HeadlineParsedText *prs, int highlight, int startpos, int endpos)
@@ -2540,8 +2671,8 @@ typedef struct
 	int32		endpos;
 	int32		poslen;
 	int32		curlen;
-	int16		in;
-	int16		excluded;
+	bool		chosen;
+	bool		excluded;
 } CoverPos;
 
 static void
@@ -2589,6 +2720,7 @@ get_next_fragment(HeadlineParsedText *prs, int *startpos, int *endpos,
 	}
 }
 
+#if PG_VERSION_NUM < 160000
 static void
 mark_hl_fragments(HeadlineParsedText *prs, TSQuery query, int highlight,
 				  int shortword, int min_words,
@@ -2643,8 +2775,8 @@ mark_hl_fragments(HeadlineParsedText *prs, TSQuery query, int highlight,
 			covers[numcovers].endpos = endpos;
 			covers[numcovers].curlen = curlen;
 			covers[numcovers].poslen = poslen;
-			covers[numcovers].in = 0;
-			covers[numcovers].excluded = 0;
+			covers[numcovers].chosen = false;
+			covers[numcovers].excluded = false;
 			numcovers++;
 			startpos = endpos + 1;
 			endpos = q;
@@ -2666,7 +2798,7 @@ mark_hl_fragments(HeadlineParsedText *prs, TSQuery query, int highlight,
 		 */
 		for (i = 0; i < numcovers; i++)
 		{
-			if (!covers[i].in && !covers[i].excluded &&
+			if (!covers[i].chosen && !covers[i].excluded &&
 				(maxitems < covers[i].poslen || (maxitems == covers[i].poslen
 												 && minwords > covers[i].curlen)))
 			{
@@ -2678,7 +2810,7 @@ mark_hl_fragments(HeadlineParsedText *prs, TSQuery query, int highlight,
 		/* if a cover was found mark it */
 		if (minI >= 0)
 		{
-			covers[minI].in = 1;
+			covers[minI].chosen = true;
 			/* adjust the size of cover */
 			startpos = covers[minI].startpos;
 			endpos = covers[minI].endpos;
@@ -2759,7 +2891,168 @@ mark_hl_fragments(HeadlineParsedText *prs, TSQuery query, int highlight,
 	}
 	pfree(covers);
 }
+#else							/* PG_VERSION_NUM >= 160000 */
+/*
+ * These macros reference the local variables 'prs' and 'shortword' that are
+ * present in both mark_hl_fragments and mark_hl_words (introduced in PG16).
+ */
+#define BADENDPOINT(i) \
+	(NOENDTOKEN(prs->words[i].type) || prs->words[i].len <= shortword)
+#define INTERESTINGWORD(i) \
+	(prs->words[i].item && !prs->words[i].repeated)
 
+static void
+mark_hl_fragments(HeadlineParsedText *prs, TSQuery query, List *locations,
+				  bool highlightall,
+				  int shortword, int min_words,
+				  int max_words, int max_fragments)
+{
+	int32		poslen,
+				curlen,
+				i,
+				f,
+				num_f = 0;
+	int32		stretch,
+				maxstretch,
+				posmarker;
+	int32		startpos = 0,
+				endpos = 0,
+				nextpos = 0,
+				p = 0,
+				q = 0;
+	int32		numcovers = 0,
+				maxcovers = 32;
+	int32		minI,
+				minwords,
+				maxitems;
+	CoverPos   *covers;
+
+	covers = palloc(maxcovers * sizeof(CoverPos));
+
+	/* get all covers */
+	while (hlCover(prs, query, locations, &nextpos, &p, &q))
+	{
+		startpos = p;
+		endpos = q;
+
+		while (startpos <= endpos)
+		{
+			get_next_fragment(prs, &startpos, &endpos, &curlen, &poslen, max_words);
+			if (numcovers >= maxcovers)
+			{
+				maxcovers *= 2;
+				covers = repalloc(covers, sizeof(CoverPos) * maxcovers);
+			}
+			covers[numcovers].startpos = startpos;
+			covers[numcovers].endpos = endpos;
+			covers[numcovers].curlen = curlen;
+			covers[numcovers].poslen = poslen;
+			covers[numcovers].chosen = false;
+			covers[numcovers].excluded = false;
+			numcovers++;
+			startpos = endpos + 1;
+			endpos = q;
+		}
+	}
+
+	/* choose best covers */
+	for (f = 0; f < max_fragments; f++)
+	{
+		maxitems = 0;
+		minwords = PG_INT32_MAX;
+		minI = -1;
+
+		for (i = 0; i < numcovers; i++)
+		{
+			if (!covers[i].chosen && !covers[i].excluded &&
+				(maxitems < covers[i].poslen ||
+				 (maxitems == covers[i].poslen &&
+				  minwords > covers[i].curlen)))
+			{
+				maxitems = covers[i].poslen;
+				minwords = covers[i].curlen;
+				minI = i;
+			}
+		}
+		if (minI >= 0)
+		{
+			covers[minI].chosen = true;
+			startpos = covers[minI].startpos;
+			endpos = covers[minI].endpos;
+			curlen = covers[minI].curlen;
+			if (curlen < max_words)
+			{
+				maxstretch = (max_words - curlen) / 2;
+				stretch = 0;
+				posmarker = startpos;
+				for (i = startpos - 1; i >= 0 && stretch < maxstretch && !prs->words[i].in; i--)
+				{
+					if (!NONWORDTOKEN(prs->words[i].type))
+					{
+						curlen++;
+						stretch++;
+					}
+					posmarker = i;
+				}
+				for (i = posmarker; i < startpos && BADENDPOINT(i); i++)
+				{
+					if (!NONWORDTOKEN(prs->words[i].type))
+						curlen--;
+				}
+				startpos = i;
+				posmarker = endpos;
+				for (i = endpos + 1; i < prs->curwords && curlen < max_words && !prs->words[i].in; i++)
+				{
+					if (!NONWORDTOKEN(prs->words[i].type))
+						curlen++;
+					posmarker = i;
+				}
+				for (i = posmarker; i > endpos && BADENDPOINT(i); i--)
+				{
+					if (!NONWORDTOKEN(prs->words[i].type))
+						curlen--;
+				}
+				endpos = i;
+			}
+			covers[minI].startpos = startpos;
+			covers[minI].endpos = endpos;
+			covers[minI].curlen = curlen;
+			mark_fragment(prs, highlightall, startpos, endpos);
+			num_f++;
+			for (i = 0; i < numcovers; i++)
+			{
+				if (i != minI &&
+					((covers[i].startpos >= startpos &&
+					  covers[i].startpos <= endpos) ||
+					 (covers[i].endpos >= startpos &&
+					  covers[i].endpos <= endpos) ||
+					 (covers[i].startpos < startpos &&
+					  covers[i].endpos > endpos)))
+					covers[i].excluded = true;
+			}
+		}
+		else
+			break;
+	}
+
+	if (num_f <= 0)
+	{
+		startpos = curlen = 0;
+		endpos = -1;
+		for (i = 0; i < prs->curwords && curlen < min_words; i++)
+		{
+			if (!NONWORDTOKEN(prs->words[i].type))
+				curlen++;
+			endpos = i;
+		}
+		mark_fragment(prs, highlightall, startpos, endpos);
+	}
+
+	pfree(covers);
+}
+#endif							/* PG_VERSION_NUM >= 160000 */
+
+#if PG_VERSION_NUM < 160000
 static void
 mark_hl_words(HeadlineParsedText *prs, TSQuery query, int highlight,
 			  int shortword, int min_words, int max_words)
@@ -2905,6 +3198,130 @@ mark_hl_words(HeadlineParsedText *prs, TSQuery query, int highlight,
 	}
 
 }
+#else							/* PG_VERSION_NUM >= 160000 */
+static void
+mark_hl_words(HeadlineParsedText *prs, TSQuery query, List *locations,
+			  bool highlightall,
+			  int shortword, int min_words, int max_words)
+{
+	int			nextpos = 0,
+				p = 0,
+				q = 0;
+	int			bestb = -1,
+				beste = -1;
+	int			bestlen = -1;
+	bool		bestcover = false;
+	int			pose,
+				posb,
+				poslen,
+				curlen;
+	bool		poscover;
+	int			i;
+
+	if (!highlightall)
+	{
+		while (hlCover(prs, query, locations, &nextpos, &p, &q))
+		{
+			curlen = 0;
+			poslen = 0;
+			posb = pose = p;
+			for (i = p; i <= q && curlen < max_words; i++)
+			{
+				if (!NONWORDTOKEN(prs->words[i].type))
+					curlen++;
+				if (INTERESTINGWORD(i))
+					poslen++;
+				pose = i;
+			}
+
+			if (curlen < max_words)
+			{
+				for (i = i - 1; i < prs->curwords && curlen < max_words; i++)
+				{
+					if (i > q)
+					{
+						if (!NONWORDTOKEN(prs->words[i].type))
+							curlen++;
+						if (INTERESTINGWORD(i))
+							poslen++;
+					}
+					pose = i;
+					if (BADENDPOINT(i))
+						continue;
+					if (curlen >= min_words)
+						break;
+				}
+				if (curlen < min_words)
+				{
+					for (i = p - 1; i >= 0; i--)
+					{
+						if (!NONWORDTOKEN(prs->words[i].type))
+							curlen++;
+						if (INTERESTINGWORD(i))
+							poslen++;
+						if (curlen >= max_words)
+							break;
+						if (BADENDPOINT(i))
+							continue;
+						if (curlen >= min_words)
+							break;
+					}
+					posb = (i >= 0) ? i : 0;
+				}
+			}
+			else
+			{
+				if (i > q)
+					i = q;
+				for (; curlen > min_words; i--)
+				{
+					if (!BADENDPOINT(i))
+						break;
+					if (!NONWORDTOKEN(prs->words[i].type))
+						curlen--;
+					if (INTERESTINGWORD(i))
+						poslen--;
+					pose = i - 1;
+				}
+			}
+
+			poscover = (posb <= p && pose >= q);
+
+			if (poscover > bestcover ||
+				(poscover == bestcover && poslen > bestlen) ||
+				(poscover == bestcover && poslen == bestlen &&
+				 !BADENDPOINT(pose) && BADENDPOINT(beste)))
+			{
+				bestb = posb;
+				beste = pose;
+				bestlen = poslen;
+				bestcover = poscover;
+			}
+		}
+
+		if (bestlen < 0)
+		{
+			curlen = 0;
+			pose = -1;
+			for (i = 0; i < prs->curwords && curlen < min_words; i++)
+			{
+				if (!NONWORDTOKEN(prs->words[i].type))
+					curlen++;
+				pose = i;
+			}
+			bestb = 0;
+			beste = pose;
+		}
+	}
+	else
+	{
+		bestb = 0;
+		beste = prs->curwords - 1;
+	}
+
+	mark_fragment(prs, highlightall, bestb, beste);
+}
+#endif							/* PG_VERSION_NUM >= 160000 */
 
 Datum
 prsd2_headline(PG_FUNCTION_ARGS)
@@ -2977,11 +3394,35 @@ prsd2_headline(PG_FUNCTION_ARGS)
 					 errmsg("MaxFragments should be >= 0")));
 	}
 
+#if PG_VERSION_NUM >= 160000
+	{
+		/*
+		 * Use TS_execute_locations() to pre-compute match positions, then
+		 * pass them to the O(n) headline selectors (PG16+ algorithm).
+		 */
+		List	   *locations;
+		hlCheck		ch;
+
+		ch.words = prs->words;
+		ch.len = prs->curwords;
+		locations = (query->size > 0)
+			? TS_execute_locations(GETQUERY(query), &ch,
+								   TS_EXEC_EMPTY, checkcondition_HL)
+			: NIL;
+
+		if (max_fragments == 0)
+			mark_hl_words(prs, query, locations, (highlight != 0),
+						  shortword, min_words, max_words);
+		else
+			mark_hl_fragments(prs, query, locations, (highlight != 0),
+							  shortword, min_words, max_words, max_fragments);
+	}
+#else							/* PG_VERSION_NUM < 160000 */
 	if (max_fragments == 0)
-		/* call the default headline generator */
 		mark_hl_words(prs, query, highlight, shortword, min_words, max_words);
 	else
 		mark_hl_fragments(prs, query, highlight, shortword, min_words, max_words, max_fragments);
+#endif							/* PG_VERSION_NUM >= 160000 */
 
 	if (!prs->startsel)
 		prs->startsel = pstrdup("<b>");
