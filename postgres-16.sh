@@ -125,4 +125,26 @@ then
     exit 1
 fi
 
+
+# Test utf8_setCjkCodePoint is not a silent no-op:
+# if it silently did nothing, Traditional Chinese input would be returned unchanged
+OUTPUT=$(docker exec postgres16 psql -U postgres -c "SELECT cjk_zht2zhs('漢') != '漢';")
+echo $OUTPUT
+if [[ "$OUTPUT" != *"t"* ]];
+then
+    echo "cjk_zht2zhs: utf8_setCjkCodePoint appears to be a silent no-op"
+    docker stop postgres16 && docker rm postgres16
+    exit 1
+fi
+
+# Test upgrade path: ALTER EXTENSION UPDATE must succeed (requires upgrade SQL script in image)
+OUTPUT=$(docker exec postgres16 psql -U postgres -c "ALTER EXTENSION pg_cjk_parser UPDATE TO '0.1.0';")
+echo $OUTPUT
+if [[ "$OUTPUT" != "ALTER EXTENSION" ]];
+then
+    echo "ALTER EXTENSION pg_cjk_parser UPDATE failed — upgrade SQL script missing from image"
+    docker stop postgres16 && docker rm postgres16
+    exit 1
+fi
+
 docker stop postgres16 && docker rm postgres16
